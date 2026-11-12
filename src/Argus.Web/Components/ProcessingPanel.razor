@@ -1,0 +1,96 @@
+@implements IAsyncDisposable
+@inject IntelligenceApiClient Client
+<section class="panel">
+    <h2>Entity processing</h2>
+    <p class="muted">Local text extraction and spaCy recognition. All generated mentions require analyst review.</p>
+    @if (error is not null) { <p role="alert" class="error">@error</p> }
+    @if (readiness is not null) { <p role="status">@readiness</p> }
+    <div class="actions">
+        @if (SourceId.HasValue) { <button disabled="@(busy || active)" @onclick="QueueAsync">Queue entity processing</button> }
+        <button disabled="@busy" @onclick="() => LoadAsync()">Refresh jobs</button>
+        <button disabled="@busy" @onclick="CheckAsync">Check NLP readiness</button>
+    </div>
+    @if (jobs is null) { <p role="status">Loading jobs...</p> }
+    else if (jobs.Total == 0) { <p>No processing jobs yet.</p> }
+    else
+    {
+        @foreach (var job in jobs.Items)
+        {
+            <div class="job-row">
+                <a href="@($"/sources/{job.SourceId}")">Source</a>
+                <strong>@job.State</strong> <span>Attempt @job.Attempts / @job.CreatedAt.ToString("u") / @job.CandidateCount candidates</span>
+                @if (job.Error is not null) { <p class="error">@job.ErrorCode: @job.Error</p> }
+                @if (job.State is JobState.PENDING or JobState.RUNNING) { <button disabled="@busy" @onclick="() => ActAsync(job.Id, false)">Cancel job</button> }
+                @if (job.State is JobState.FAILED or JobState.CANCELLED) { <button disabled="@busy" @onclick="() => ActAsync(job.Id, true)">Retry job</button> }
+            </div>
+        }
+        <div class="actions"><button disabled="@(page == 1 || busy)" @onclick="() => PageAsync(-1)">Previous jobs</button>
+            <span>Page @(page) / @jobs.Total jobs</span><button disabled="@(page * jobs.PageSize >= jobs.Total || busy)" @onclick="() => PageAsync(1)">Next jobs</button></div>
+    }
+</section>
+@code {
+    [Parameter] public Guid? SourceId { get; set; }
+    [Parameter] public Guid? InvestigationId { get; set; }
+    [Parameter] public EventCallback Changed { get; set; }
+    private PageResult<JobResponse>? jobs;
+    private string? error, readiness, fingerprint;
+    private int page = 1;
+    private bool busy, active, initialized;
+    private readonly CancellationTokenSource stop = new();
+    private Task? poll;
+    protected override async Task OnParametersSetAsync()
+    {
+        if (initialized) return;
+        initialized = true; await LoadAsync();
+    }
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) poll = PollAsync();
+        return Task.CompletedTask;
+    }
+    private async Task PollAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stop.Token))
+                if (!busy) await InvokeAsync(async () => { await LoadAsync(stop.Token); StateHasChanged(); });
+        }
+        catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
+    }
+    private async Task LoadAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            jobs = await Client.JobsAsync(SourceId, InvestigationId, page, ct);
+            active = jobs.Items.Any(x => x.State is JobState.PENDING or JobState.RUNNING);
+            var next = string.Join(";", jobs.Items.Select(x => $"{x.Id}:{x.State}:{x.Attempts}"));
+            if (next != fingerprint)
+            {
+                fingerprint = next;
+                await Changed.InvokeAsync();
+            }
+        }
+        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { error = "Job refresh timed out."; }
+    }
+    private async Task QueueAsync() => await ExecuteAsync(async () => { await Client.QueueAsync(SourceId!.Value); page = 1; });
+    private async Task ActAsync(Guid id, bool retry) => await ExecuteAsync(async () => { if (retry) await Client.RetryAsync(id); else await Client.CancelAsync(id); });
+    private async Task ExecuteAsync(Func<Task> action)
+    {
+        busy = true; error = null;
+        try { await action(); await LoadAsync(); }
+        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (TaskCanceledException) { error = "The request timed out. Refresh before retrying."; }
+        finally { busy = false; }
+    }
+    private async Task CheckAsync() => await ExecuteAsync(async () => readiness = await Client.ReadyAsync()
+        ? "Local NLP service and trained model are ready." : "NLP service is unavailable or its model is missing. Start it using the README instructions.");
+    private async Task PageAsync(int delta) { page += delta; await LoadAsync(); }
+    public async ValueTask DisposeAsync()
+    {
+        stop.Cancel();
+        if (poll is not null) try { await poll; } catch (OperationCanceledException) { }
+        stop.Dispose();
+    }
+}

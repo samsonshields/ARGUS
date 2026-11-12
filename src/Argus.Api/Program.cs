@@ -8,6 +8,8 @@ using Microsoft.EntityFrameworkCore;
 using Argus.Api.Middleware;
 using Argus.Infrastructure.Storage;
 using Microsoft.AspNetCore.Http.Features;
+using Argus.Infrastructure.ExternalServices;
+using Argus.Api.BackgroundJobs;
 if (args.Length == 5 && args[0] == "--extract-pdf")
 {
     Environment.ExitCode = TextExtraction.RunPdfWorker(args);
@@ -17,7 +19,28 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false)));
 builder.Services.AddProblemDetails();
+builder.Services.AddOpenApi();
+builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context => new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(
+        new Microsoft.AspNetCore.Mvc.ValidationProblemDetails(context.ModelState) { Status = 400, Extensions = { ["code"] = "validation_failed" } });
+});
 builder.Services.AddExceptionHandler<SourceExceptionHandler>();
+builder.Services.AddOptions<IntelligenceOptions>().Bind(builder.Configuration.GetSection("Intelligence"))
+    .Validate(x => Uri.TryCreate(x.BaseUrl, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https"
+        && x.TimeoutSeconds is >= 1 and <= 120 && x.MaxAttempts is >= 1 and <= 5 && x.RetryDelaySeconds is >= 0 and <= 60
+        && x.MaxTextCharacters is > 0 and <= 2_000_000 && x.MaxCandidates is > 0 and <= 5000
+        && x.MatchThreshold is >= 0.5 and <= 1, "Invalid intelligence configuration.").ValidateOnStart();
+builder.Services.AddHttpClient<IIntelligenceClient, IntelligenceClient>((services, client) =>
+{
+    var options = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<IntelligenceOptions>>().Value;
+    client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+});
+builder.Services.AddScoped<ProcessingJobService>();
+builder.Services.AddScoped<ProcessingRunner>();
+builder.Services.AddScoped<EntityReviewService>();
+builder.Services.AddHostedService<IntelligenceWorker>();
 builder.Services.AddOptions<DocumentOptions>().Bind(builder.Configuration.GetSection("Documents"))
     .Validate(x => x.MaxFileBytes is > 0 and <= 100 * 1024 * 1024 && x.MaxExtractedCharacters is > 0 and <= 2_000_000
         && x.MaxPdfPages is > 0 and <= 5000 && x.ExtractionTimeoutSeconds is > 0 and <= 120, "Invalid document limits.").ValidateOnStart();
@@ -51,6 +74,7 @@ app.UseStatusCodePages();
 using (var scope = app.Services.CreateScope())
     await scope.ServiceProvider.GetRequiredService<ArgusDbContext>().Database.MigrateAsync();
 app.MapControllers();
+app.MapOpenApi();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 app.Run();
 public partial class Program;

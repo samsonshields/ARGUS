@@ -1,4 +1,4 @@
-# API contracts (Phases 1 and 2)
+# API contracts (Phases 1–3)
 
 Base: http://localhost:5100/api/v1. JSON uses camelCase, string statuses Active/Archived,
 GUID IDs, ISO UTC timestamps and YYYY-MM-DD scope dates.
@@ -42,8 +42,8 @@ All routes below use the same `/api/v1` base. No NLP `/process` endpoint is impl
 | GET | /import-settings | `{ "maxFileBytes": 10485760 }` (configured value) |
 | GET | /source-statistics | `{ "total": 0, "ready": 0, "failed": 0 }` |
 | GET | /investigations/{id}/sources?search=term&from=2026-01-01&to=2026-01-31 | 200 source summary array, newest retrieved first; 404 missing parent |
-| POST | /investigations/{id}/sources | multipart upload; 201 detailed source with Location |
-| POST | /investigations/{id}/sources/text | pasted-text JSON; 201 detailed source with Location |
+| POST | /investigations/{id}/sources | multipart upload; 201 preserved source with Location and a durable queued job |
+| POST | /investigations/{id}/sources/text | pasted-text JSON; 201 preserved source with Location and a durable queued job |
 | GET | /sources/{id} | 200 detailed source or 404 |
 | PUT | /sources/{id} | replacement metadata; 200 detailed source or 404 |
 | POST | /sources/{id}/extract-text | synchronous extraction retry; 200 detailed source or 404 |
@@ -53,7 +53,8 @@ Multipart fields: `File` (required), `Title` (required, 1-200 non-whitespace cha
 `Publisher` (optional, max 200), `OriginalUrl` (optional absolute HTTP(S) URL, max 2048,
 stored only), `PublishedAt` (optional YYYY-MM-DD date), `Reliability` (A/B/C/D/E, default E).
 Metadata text is trimmed; blank optional strings become null. MIME headers are untrusted;
-only .txt/.pdf extensions are accepted and bytes must also pass text/PDF extraction.
+only .txt/.pdf extensions are accepted. In the default Phase 3 mode, extraction runs
+after acceptance in the background job and byte-format errors are recorded there.
 Unsupported types return 415, empty files 400, oversize files 413. Very large HTTP/form
 bodies are also bounded by server limits; ASP.NET binding failures can return 400.
 
@@ -96,7 +97,14 @@ Exact duplicate bytes within an investigation return 409 Problem Details with
 `existingSourceId`, regardless of filename/title. A database unique constraint also
 guards concurrent uploads. Different investigations can each preserve their own copy.
 
-Extraction failures still create a 201 source with `processingStatus: "Failed"` and
+Phase 3 default imports return `processingStatus: "Pending"`; the worker moves sources
+through Processing to Ready/Failed. `ProcessingStatus` describes text extraction,
+while the separate job describes NLP completion. Thus a source can be Ready with
+a failed NLP job if its text was extracted but the NLP service was unavailable.
+Source response shape is unchanged; discover queued jobs by sourceId below.
+
+With `Intelligence:AutoProcessImports=false`, the compatibility text-only mode remains:
+extraction failures create a 201 source with `processingStatus: "Failed"` and
 a safe `processingError`; originals are retained for inspection. A failed retry returns
 200 Failed, keeping prior successful extracted text/time/version. Failed retries do not
 imply the prior text is current. PDFs may be encrypted, malformed, image-only or over
@@ -105,3 +113,69 @@ limits. OCR and remote fetching are unavailable.
 Web exposes `/downloads/sources/{id}` as an attachment proxy to the API, with no SQLite
 or local document access. Source import/metadata/retry audit events are committed with
 their associated database changes; no public audit-editing API exists.
+
+## Phase 3 processing and entity review
+
+New collections return `{ "items": [...], "total": 0, "page": 1, "pageSize": 50 }`.
+`page` accepts 1–1,000,000 and `pageSize` 1–100. Existing investigation/source list
+array contracts remain unchanged for compatibility. Ordering is deterministic.
+
+| Method | Route | Result |
+| --- | --- | --- |
+| GET | /intelligence/health | 200 ready or 503 NLP/model unavailable |
+| GET | /intelligence/statistics | proposed, approvedEntities, pendingJobs, failedJobs counts |
+| POST | /sources/{id}/process | 202 job + Location; 409 if a job is already active |
+| GET | /processing-jobs?investigationId=&sourceId=&page=1&pageSize=50 | paged job history, newest first |
+| GET | /processing-jobs/{id} | current persisted job |
+| POST | /processing-jobs/{id}/cancel | 200 CANCELLED; 409 for terminal jobs |
+| POST | /processing-jobs/{id}/retry | 202 new job for FAILED/CANCELLED; 409 otherwise |
+| GET | /investigations/{id}/mentions?sourceId=&entityId=&status=PROPOSED&page=1&pageSize=50 | paged mentions, ordered source/start/id |
+| GET | /mentions/{id}/evidence | mention + before/quote/after + immutable textHash |
+| GET | /mentions/{id}/suggestions | up to 10 same-type name/alias matches; never automatically merged |
+| POST | /mentions/{id}/approve | 200 approved entity; 409 if already reviewed |
+| POST | /mentions/{id}/reject | 204; 409 if already reviewed |
+| GET | /investigations/{id}/entities?search=&page=1&pageSize=50 | paged active approved canonical entities |
+| GET | /entities/{id} | canonical record, aliases, approved mention count and optional mergedIntoId |
+| PUT | /entities/{id} | corrected canonical name/type; old name retained as alias |
+| POST | /entities/merge | confirmed same-investigation, same-type merge; 200 retained entity |
+
+Job fields: id/sourceId/investigationId/state/attempts/errorCode/error/createdAt/updatedAt/
+nextAttemptAt/snapshotId/candidateCount. States: PENDING, RUNNING, COMPLETED, FAILED,
+CANCELLED. Active jobs are unique per source. Source originals and reviewed findings
+remain intact on failures. Transient failures retry within the configured total attempt
+budget; permanent extraction/contract/limit failures do not retry automatically.
+Interrupted running jobs recover on startup with their attempt count preserved.
+
+Mention fields: id/sourceId/sourceTitle/snapshotId/text/originalType/start/end/status/
+entityId/modelName/modelVersion/confidence (always null). Types are PERSON, ORGANIZATION,
+LOCATION, DATE, EVENT, OTHER; review statuses are PROPOSED, APPROVED, REJECTED.
+GET evidence returns a highlighted passage context in the UI; no raw HTML is returned.
+Spans index the immutable text snapshot, not a mutable current extraction.
+
+Approve request: `{ "name": "Alice Morgan", "type": "PERSON", "entityId": null }`.
+Name is required and at most 200 characters. Optional entityId explicitly associates
+the mention with an active canonical record in the same investigation; name/type
+must match that record. Otherwise a new entity is created even for identical names.
+Original mention text/type/model provenance are never overwritten by corrections.
+PUT entity accepts name/type only. Mentions keep their original evidence after renames.
+
+Merge request: `{ "sourceId": "<entity GUID>", "targetId": "<entity GUID>", "confirm": true }`.
+Source and target must be different, active, of the same type and investigation.
+The former entity remains with mergedIntoId; its aliases and approved mentions move
+to the target atomically. Opposite/cyclic or stale merges are guarded by optimistic
+concurrency. Invalid confirmation returns 400; incompatible records return 409.
+
+New validation responses include `code: "validation_failed"`; concurrency errors
+include `code: "concurrent_update"`; domain errors have machine-readable request codes.
+Job error codes include interrupted, cancelled, text_extraction_failed, nlp_unavailable,
+nlp_timeout, nlp_not_ready, nlp_error, invalid_contract, response_limit, text_limit and
+processing_failed. No document content is included in technical failures.
+
+The `/sources/{id}/extract-text` text-only endpoint returns 409 while a job owns the
+source. Use `/process` for asynchronous extraction plus NLP. Reprocessing identical
+text reuses mentions by snapshot/span/type and keeps prior review decisions. Changed
+text adds a new snapshot and candidates; older evidence remains available.
+
+.NET publishes `/openapi/v1.json`. See [Python JSON contract](nlp-contracts.md) for
+readiness, hashing, label mapping and UTF-16 span rules. Phase 4 graph/relationship
+APIs and Python relationship/event processing endpoints remain absent.

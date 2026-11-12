@@ -14,7 +14,7 @@ else if (investigation is not null && limits is not null)
 {
     <section class="panel">
         <h2>Import a source</h2>
-        <p class="muted">Text and extractable PDF files, up to @(limits.MaxFileBytes / 1024) KiB. Scanned PDFs need OCR, which is not supported.</p>
+        <p class="muted">Text and extractable PDF files, up to @(limits.MaxFileBytes / 1024) KiB. Imports queue background entity processing. Scanned PDFs need OCR, which is not supported.</p>
         <label for="input-kind">Input method</label>
         <select id="input-kind" @bind="inputKind" disabled="@importing"><option value="file">Upload file</option><option value="paste">Paste text</option></select>
         <EditForm Model="metadata" OnValidSubmit="ImportAsync" FormName="source-import" class="editor">
@@ -29,7 +29,7 @@ else if (investigation is not null && limits is not null)
             {
                 <label for="paste">Source text</label><InputTextArea id="paste" @bind-Value="pastedText" maxlength="2000000" />
             }
-            <button disabled="@importing" type="submit">@(importing ? "Importing and extracting text..." : "Import source")</button>
+            <button disabled="@importing" type="submit">@(importing ? "Saving original..." : "Import source")</button>
         </EditForm>
     </section>
     <h2>Source library (@items.Count)</h2>

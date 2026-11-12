@@ -1,0 +1,102 @@
+@page "/entities/{Id:guid}"
+@rendermode InteractiveServer
+@inject IntelligenceApiClient Client
+@inject NavigationManager Navigation
+<PageTitle>ARGUS | Entity evidence</PageTitle>
+@if (error is not null) { <p role="alert" class="error">@error</p> }
+@if (entity is null) { <p>Entity loading, or unavailable.</p> }
+else
+{
+    <a href="@($"/investigations/{entity.InvestigationId}/entities")">Investigation entities and review</a>
+    <p class="eyebrow">ANALYST-APPROVED ENTITY</p><h1>@entity.Name</h1>
+    <p>@entity.Type / @entity.MentionCount approved mentions</p>
+    @if (success is not null) { <p role="status" class="success">@success</p> }
+    @if (entity.MergedIntoId.HasValue)
+    { <p>This entity was merged. <a href="@($"/entities/{entity.MergedIntoId}")">Open the retained entity</a>.</p> }
+    else
+    {
+        <EditForm Model="edit" OnValidSubmit="SaveAsync" FormName="edit-entity" class="panel editor">
+            <DataAnnotationsValidator /><ValidationSummary />
+            <label for="canonical-name">Canonical name</label><InputText id="canonical-name" @bind-Value="edit.Name" maxlength="200" />
+            <label for="canonical-type">Entity classification</label><InputSelect id="canonical-type" @bind-Value="edit.Type">
+                @foreach (var type in Enum.GetValues<EntityType>()) { <option value="@type">@type</option> }
+            </InputSelect>
+            <p class="muted">Original mention text and model labels are preserved. Renames retain the previous name as an alias.</p>
+            <button type="submit" disabled="@busy">Save correction</button>
+        </EditForm>
+        <p>Known aliases: @(entity.Aliases.Count == 0 ? "None" : string.Join(", ", entity.Aliases))</p>
+        <section class="panel"><h2>Merge duplicate entities</h2>
+            <p>Merge only after confirming both records refer to the same entity. Similar names alone are insufficient.</p>
+            <div class="filters"><label>Find the entity to retain<input @bind="targetSearch" maxlength="200" /></label><button disabled="@busy" @onclick="FindTargetsAsync">Find targets</button></div>
+            <label for="merge-target">Retained entity</label><select id="merge-target" @bind="targetId" @bind:after="() => confirming = false">
+                <option value="">Choose an entity</option>
+                @foreach (var target in targets.Where(x => x.Id != Id && x.Type == entity.Type))
+                { <option value="@target.Id">@target.Name / @target.Type</option> }
+            </select>
+            @if (targetTotal > 0)
+            {
+                <div class="actions"><button disabled="@(busy || targetPage == 1)" @onclick="() => TargetPageAsync(-1)">Previous matches</button>
+                    <button disabled="@(busy || targetPage * targetPageSize >= targetTotal)" @onclick="() => TargetPageAsync(1)">Next matches</button></div>
+                @if (targetId.HasValue) { <a href="@($"/entities/{targetId}")" target="_blank" rel="noopener">Inspect selected entity and its evidence</a> }
+            }
+            @if (!confirming) { <button disabled="@(busy || !targetId.HasValue)" @onclick="() => confirming = true">Review merge</button> }
+            else
+            {
+                <p>Move all approved mentions from <strong>@entity.Name</strong> into <strong>@targets.FirstOrDefault(x => x.Id == targetId)?.Name</strong>?
+                    The former record and source provenance will remain in history.</p>
+                <button disabled="@busy" @onclick="MergeAsync">Confirm entity merge</button><button disabled="@busy" @onclick="() => confirming = false">Cancel</button>
+            }
+        </section>
+    }
+    <h2>Source mentions</h2>
+    @if (mentions is not null)
+    {
+        @foreach (var mention in mentions.Items)
+        { <div class="mention-row"><button disabled="@busy" @onclick="() => EvidenceAsync(mention.Id)">@mention.Text</button><span>@mention.SourceTitle / Original label @mention.OriginalType</span></div> }
+        <div class="actions"><button disabled="@(page == 1 || busy)" @onclick="() => PageAsync(-1)">Previous mentions</button><span>Page @(page) / @mentions.Total mentions</span>
+            <button disabled="@(page * mentions.PageSize >= mentions.Total || busy)" @onclick="() => PageAsync(1)">Next mentions</button></div>
+    }
+    <MentionEvidenceView Evidence="evidence" />
+}
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private EntityResponse? entity;
+    private PageResult<MentionResponse>? mentions;
+    private MentionEvidence? evidence;
+    private EntityEditRequest edit = new();
+    private List<EntityResponse> targets = [];
+    private string targetSearch = "";
+    private Guid? targetId;
+    private string? error, success;
+    private int page = 1;
+    private int targetPage = 1, targetTotal, targetPageSize = 20;
+    private bool busy, confirming;
+    protected override async Task OnParametersSetAsync()
+    {
+        entity = null; error = success = null; evidence = null; targetId = null; targets = []; confirming = false; page = 1;
+        await ExecuteAsync(async () => { entity = await Client.EntityAsync(Id); edit = new() { Name = entity.Name, Type = entity.Type }; await LoadMentionsAsync(); });
+    }
+    private async Task LoadMentionsAsync() => mentions = await Client.MentionsAsync(entity!.InvestigationId, null, Id, "APPROVED", page);
+    private async Task SaveAsync() => await ExecuteAsync(async () => { entity = await Client.UpdateAsync(Id, edit); success = "Entity correction saved."; });
+    private async Task FindTargetsAsync() => await ExecuteAsync(async () => { targetPage = 1; await LoadTargetsAsync(); });
+    private async Task TargetPageAsync(int delta) => await ExecuteAsync(async () => { targetPage += delta; await LoadTargetsAsync(); });
+    private async Task LoadTargetsAsync()
+    {
+        var result = await Client.EntitiesAsync(entity!.InvestigationId, targetSearch, targetPage);
+        targets = result.Items.ToList(); targetTotal = result.Total; targetPageSize = result.PageSize; targetId = null; confirming = false;
+    }
+    private async Task MergeAsync() => await ExecuteAsync(async () => {
+        var retained = await Client.MergeAsync(new() { SourceId = Id, TargetId = targetId!.Value, Confirm = true });
+        Navigation.NavigateTo($"/entities/{retained.Id}");
+    });
+    private async Task EvidenceAsync(Guid id) => await ExecuteAsync(async () => evidence = await Client.EvidenceAsync(id));
+    private async Task PageAsync(int delta) => await ExecuteAsync(async () => { page += delta; await LoadMentionsAsync(); });
+    private async Task ExecuteAsync(Func<Task> action)
+    {
+        busy = true; error = null;
+        try { await action(); }
+        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (TaskCanceledException) { error = "The request timed out. Reload before retrying."; }
+        finally { busy = false; }
+    }
+}

@@ -9,6 +9,8 @@ else if (item is not null)
     <a href="@($"/investigations/{item.Source.InvestigationId}/sources")">Back to investigation sources</a>
     <p class="eyebrow">SOURCE VIEWER / @item.Source.SourceType / @item.Source.ProcessingStatus</p>
     <h1>@item.Source.Title</h1>
+    <ProcessingPanel @key="(Id, nameof(ProcessingPanel))" SourceId="Id" InvestigationId="item.Source.InvestigationId" Changed="ProcessingChangedAsync" />
+    <EntityReviewPanel @key="(Id, nameof(EntityReviewPanel))" @ref="review" SourceId="Id" InvestigationId="item.Source.InvestigationId" />
     @if (Imported) { <p role="status" class="success">Original source saved.</p> }
     @if (success is not null) { <p role="status" class="success">@success</p> }
     @if (item.Source.ProcessingError is not null) { <p role="alert" class="error">@item.Source.ProcessingError</p> }
@@ -20,7 +22,7 @@ else if (item is not null)
             <dt>Extraction</dt><dd>@(item.ExtractedAt?.ToString("u") ?? "No successful extraction") / @item.ExtractionVersion</dd></dl>
         <a class="button" href="@($"/downloads/sources/{Id}")" data-enhance-nav="false">Download original</a>
         <button disabled="@busy" @onclick="ReextractAsync">@(busy ? "Working..." : "Retry text extraction")</button>
-        <p class="muted">Text extraction does not verify claims. No NLP or OCR is run.</p>
+        <p class="muted">The text-only retry button does not run NLP. Use entity processing above for extraction and NLP. OCR is unavailable.</p>
     </section>
     <section class="panel"><h2>Extracted text</h2>
         @if (item.ExtractedAt.HasValue && item.Source.ProcessingStatus == SourceProcessingStatus.Failed)
@@ -41,9 +43,16 @@ else if (item is not null)
     private SourceMetadataRequest metadata = new();
     private string? error, success;
     private bool loading = true, busy;
+    private EntityReviewPanel? review;
+    private async Task ProcessingChangedAsync()
+    {
+        try { item = await Sources.GetAsync(Id); if (review is not null) await review.ReloadAsync(); }
+        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (TaskCanceledException) { error = "Source refresh timed out."; }
+    }
     protected override async Task OnParametersSetAsync()
     {
-        loading = true; item = null; error = null;
+        loading = true; item = null; error = null; review = null;
         try { SetItem(await Sources.GetAsync(Id)); }
         catch (HttpRequestException ex) { error = ex.Message; }
         catch (TaskCanceledException) { error = "Source loading timed out. Reload to retry."; }

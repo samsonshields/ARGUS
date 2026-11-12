@@ -1,0 +1,9 @@
+FICTIONAL TRAINING MATERIAL - Operation Meridian
+All people, organizations, locations and activities below are fabricated.
+
+On March 12, 2026, Alice Morgan met representatives of Aster Maritime Cooperative
+in Port Lumen. The fictional delegation discussed routine cargo documentation.
+Alice Morgan returned to Meridian Research Council to prepare a training summary.
+
+This synthetic report is for testing entity extraction and human review only.
+An extracted name or co-mention does not establish a substantive relationship.

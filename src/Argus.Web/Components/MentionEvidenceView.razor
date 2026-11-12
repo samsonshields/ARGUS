@@ -1,0 +1,12 @@
+@if (Evidence is not null)
+{
+    <div class="panel evidence">
+        <h3>Exact source passage</h3>
+        <p>@Evidence.Before<mark>@Evidence.Quote</mark>@Evidence.After</p>
+        <p class="muted">Offsets @Evidence.Mention.Start–@Evidence.Mention.End (UTF-16, end exclusive).
+            Model: @Evidence.Mention.ModelName @Evidence.Mention.ModelVersion. Confidence: unavailable.</p>
+        <a href="@($"/sources/{Evidence.Mention.SourceId}")">@Evidence.Mention.SourceTitle</a>
+        <p class="muted">This passage comes from the preserved processing snapshot, including after text is re-extracted.</p>
+    </div>
+}
+@code { [Parameter] public MentionEvidence? Evidence { get; set; } }

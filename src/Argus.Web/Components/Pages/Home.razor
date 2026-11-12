@@ -1,6 +1,7 @@
 @page "/"
 @inject InvestigationClient Client
 @inject SourceClient Sources
+@inject IntelligenceApiClient Intelligence
 <PageTitle>ARGUS | Dashboard</PageTitle>
 <p class="eyebrow">WORKSPACE OVERVIEW</p>
 <h1>Investigation dashboard</h1>
@@ -16,6 +17,9 @@ else
         <section><span>Imported sources</span><strong>@statistics?.Total</strong></section>
         <section><span>Text extraction complete</span><strong>@statistics?.Ready</strong></section>
         <section><span>Extraction failures</span><strong>@statistics?.Failed</strong></section>
+        <section><span>Mentions awaiting review</span><strong>@intelligence?.Proposed</strong></section>
+        <section><span>Approved entities</span><strong>@intelligence?.ApprovedEntities</strong></section>
+        <section><span>Active / failed NLP jobs</span><strong>@intelligence?.PendingJobs / @intelligence?.FailedJobs</strong></section>
     </div>
     <div class="section-heading"><h2>Recently updated</h2><a class="button" href="/investigations/new">New investigation</a></div>
     @if (items.Count == 0) { <div class="panel"><h3>Your workspace is ready</h3><p>Create an investigation to define its research scope.</p></div> }
@@ -28,9 +32,10 @@ else
     private List<InvestigationResponse>? items;
     private string? error;
     private SourceStatistics? statistics;
+    private IntelligenceStatistics? intelligence;
     protected override async Task OnInitializedAsync()
     {
-        try { items = await Client.ListAsync(); statistics = await Sources.StatisticsAsync(); }
+        try { items = await Client.ListAsync(); statistics = await Sources.StatisticsAsync(); intelligence = await Intelligence.StatisticsAsync(); }
         catch (HttpRequestException) { error = "Cannot reach the API. Check that it is running, then retry."; }
         catch (TaskCanceledException) { error = "The API request timed out. Please retry."; }
     }
