@@ -219,6 +219,72 @@ def main() -> None:
                 expect(canvas).to_have_attribute("data-edges", "0")
                 page.get_by_label("Include proposed edges", exact=True).check()
                 expect(canvas).to_have_attribute("data-edges", "1")
+                # Bulk approval covers every matching page; cancel is read-only.
+                page.goto(web_url + f"/sources/{source}")
+                expect(page.locator("[data-review-ready]")).to_have_attribute(
+                    "data-review-ready", "true"
+                )
+                bulk_button = page.get_by_role(
+                    "button", name="Bulk approve proposed candidates", exact=True
+                )
+                bulk_button.click()
+                confirmation = page.get_by_role(
+                    "region", name="Bulk approval confirmation", exact=True
+                )
+                expect(confirmation).to_contain_text("72 proposed mentions")
+                grouping = page.get_by_label(
+                    "Group identical names and types within this batch", exact=True
+                )
+                expect(grouping).not_to_be_checked()
+                expect(confirmation).to_contain_text("Create 72 new entities")
+                page.get_by_role(
+                    "button", name="Cancel bulk approval", exact=True
+                ).click()
+                expect(confirmation).to_have_count(0)
+                assert (
+                    json.loads(request(mentions_url + "?status=PROPOSED"))["total"]
+                    == 72
+                )
+                bulk_button.click()
+                expect(confirmation).to_be_visible()
+                page.get_by_label("Candidate type", exact=True).select_option("PERSON")
+                expect(confirmation).to_have_count(0)
+                bulk_button.click()
+                expect(confirmation).to_contain_text("24 proposed mentions")
+                page.get_by_label("Candidate type", exact=True).select_option("")
+                expect(confirmation).to_have_count(0)
+                bulk_button.click()
+                expect(confirmation).to_contain_text("72 proposed mentions")
+                grouping.check()
+                expect(confirmation).to_contain_text("Create 3 new entities")
+                page.get_by_role(
+                    "button", name="Confirm bulk approval", exact=True
+                ).click()
+                expect(
+                    page.get_by_text(
+                        "Bulk approval complete: 72 mentions approved; 3 entities created.",
+                        exact=True,
+                    )
+                ).to_be_visible()
+                expect(
+                    page.get_by_text("No proposed mentions in this view.", exact=True)
+                ).to_be_visible()
+                assert (
+                    json.loads(request(mentions_url + "?status=APPROVED"))["total"]
+                    == 74
+                )
+                assert (
+                    json.loads(request(mentions_url + "?status=REJECTED"))["total"] == 1
+                )
+                assert (
+                    json.loads(request(route + f"/investigations/{inv}/entities"))[
+                        "total"
+                    ]
+                    == 5
+                )
+                page.screenshot(
+                    path=str(local / "bulk-approval-complete.png"), full_page=True
+                )
                 browser.close()
             if args.pdf:
                 pdf_inv = json.loads(
@@ -262,11 +328,45 @@ def main() -> None:
                         == mention["text"]
                     )
                 assert {"China", "Russia"}.issubset({m["text"] for m in all_mentions})
+                preview = json.loads(
+                    request(
+                        route
+                        + f"/investigations/{pdf_inv}/mentions/bulk-approval-preview?sourceId={pdf_source}"
+                    )
+                )
+                assert len(preview["candidateIds"]) == len(all_mentions)
+                result = json.loads(
+                    request(
+                        route + f"/investigations/{pdf_inv}/mentions/approve-bulk",
+                        "POST",
+                        {
+                            "candidateIds": preview["candidateIds"],
+                            "confirm": True,
+                            "groupIdenticalNames": True,
+                        },
+                    )
+                )
+                assert result["approvedCount"] == len(all_mentions)
+                assert result["createdEntityCount"] == preview["distinctNameTypeCount"]
+                assert (
+                    json.loads(
+                        request(
+                            route
+                            + f"/investigations/{pdf_inv}/mentions?status=PROPOSED"
+                        )
+                    )["total"]
+                    == 0
+                )
+                assert json.loads(
+                    request(
+                        route + f"/investigations/{pdf_inv}/mentions?status=APPROVED"
+                    )
+                )["total"] == len(all_mentions)
                 print(
-                    f"PASS: local PDF import and real NER; {len(all_mentions)} proposals with exact UTF-16 source spans; originals and normal investigation untouched."
+                    f"PASS: local PDF import, exact UTF-16 spans and bulk approval of {len(all_mentions)} mentions into {result['createdEntityCount']} entities with explicit grouping; normal investigation untouched."
                 )
             print(
-                "PASS: real-model numeric-noise filter, repeated mentions/pagination, immediate approved/rejected/all review filters, search/type filters, canonical entity visibility and immediate proposed-edge toggle; current UI styling preserved."
+                "PASS: real-model numeric-noise filter, repeated mentions/pagination, immediate approved/rejected/all review filters, search/type filters, canonical entity visibility, immediate proposed-edge toggle and bulk preview/cancel/filter reset/grouped approval across all pages; current UI styling preserved."
             )
         finally:
             stop(web)

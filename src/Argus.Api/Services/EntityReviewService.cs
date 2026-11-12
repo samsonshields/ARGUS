@@ -29,18 +29,71 @@ public sealed class EntityReviewService(ArgusDbContext db, IOptions<Intelligence
         if (sourceId.HasValue) query = query.Where(x => x.SourceId == sourceId);
         if (entityId.HasValue) query = query.Where(x => x.EntityId == entityId);
         if (status.HasValue) query = query.Where(x => x.Status == status);
-        if (type.HasValue) query = query.Where(x => x.OriginalType == type);
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var term = search.Trim().ToUpperInvariant();
-            query = query.Where(x => x.Text.ToUpper().Contains(term));
-        }
+        query = FilterMentions(query, type, search);
         var count = await query.CountAsync(ct);
         var items = await query.OrderBy(x => x.SourceId).ThenBy(x => x.Start).ThenBy(x => x.Id)
             .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
         var sourceIds = items.Select(x => x.SourceId).Distinct().ToArray();
         var titles = await db.Sources.Where(x => sourceIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Title, ct);
         return new(items.Select(x => x.ToResponse(titles[x.SourceId])).ToList(), count, page, pageSize);
+    }
+    public async Task<BulkMentionPreview> PreviewBulkApprovalAsync(Guid investigationId, Guid? sourceId, EntityType? type, string? search, CancellationToken ct)
+    {
+        if (!await db.Investigations.AnyAsync(x => x.Id == investigationId, ct)) throw new SourceException(404, "Investigation not found.");
+        if (sourceId.HasValue && !await db.Sources.AnyAsync(x => x.Id == sourceId && x.InvestigationId == investigationId, ct))
+            throw new SourceException(404, "Source not found in this investigation.");
+        var query = db.EntityMentions.AsNoTracking().Where(x => x.InvestigationId == investigationId && x.Status == ReviewStatus.PROPOSED);
+        if (sourceId.HasValue) query = query.Where(x => x.SourceId == sourceId);
+        var mentions = await FilterMentions(query, type, search).OrderBy(x => x.SourceId).ThenBy(x => x.Start).ThenBy(x => x.Id).Take(5001).ToListAsync(ct);
+        if (mentions.Count > 5000) throw new SourceException(413, "Bulk approval is limited to 5000 candidates. Narrow the source, type or text filter.");
+        var eligible = mentions.Where(CanBulkApprove).ToList();
+        return new(eligible.Select(x => x.Id).ToArray(), mentions.Count, mentions.Count - eligible.Count,
+            eligible.Select(x => (IntelligenceEntity.Normalize(x.Text), x.OriginalType)).Distinct().Count());
+    }
+    public async Task<BulkMentionApprovalResult> BulkApproveAsync(Guid investigationId, BulkApproveMentionsRequest request, CancellationToken ct)
+    {
+        if (!request.Confirm || request.CandidateIds is null || request.CandidateIds.Length is < 1 or > 5000
+            || request.CandidateIds.Any(x => x == Guid.Empty) || request.CandidateIds.Distinct().Count() != request.CandidateIds.Length)
+            throw new SourceException(400, "Confirm approval of 1 to 5000 distinct candidate IDs.");
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        if (!await db.Investigations.AnyAsync(x => x.Id == investigationId, ct)) throw new SourceException(404, "Investigation not found.");
+        var mentions = await db.EntityMentions.Where(x => x.InvestigationId == investigationId && request.CandidateIds.Contains(x.Id))
+            .OrderBy(x => x.SourceId).ThenBy(x => x.Start).ThenBy(x => x.Id).ToListAsync(ct);
+        if (mentions.Count != request.CandidateIds.Length) throw new SourceException(404, "Selected candidates were not found in this investigation.");
+        if (mentions.Any(x => x.Status != ReviewStatus.PROPOSED)) throw new SourceException(409, "A selected candidate was already reviewed. Preview the batch again; no candidates were approved.");
+        if (mentions.Any(x => !CanBulkApprove(x))) throw new SourceException(400, "Some candidates need a shorter canonical name. Review those individually.");
+        var batchId = Guid.NewGuid();
+        var entities = new Dictionary<(string, EntityType), IntelligenceEntity>();
+        var created = 0;
+        foreach (var mention in mentions)
+        {
+            var key = (IntelligenceEntity.Normalize(mention.Text), mention.OriginalType);
+            IntelligenceEntity entity;
+            if (request.GroupIdenticalNames && entities.TryGetValue(key, out var grouped)) entity = grouped;
+            else
+            {
+                entity = new(investigationId, new EntityEditRequest { Name = mention.Text, Type = mention.OriginalType });
+                db.Entities.Add(entity); created++;
+                if (request.GroupIdenticalNames) entities.Add(key, entity);
+            }
+            mention.Approve(entity); entity.TouchForAssociation();
+            Audit(investigationId, "EntityMention", mention.Id, "BulkApproved", new { batchId, mention.EntityId, mention.Status, mention.SnapshotId });
+        }
+        Audit(investigationId, "EntityMentionBatch", batchId, "Approved", new { ApprovedCount = mentions.Count, CreatedEntityCount = created, request.GroupIdenticalNames });
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return new(batchId, mentions.Count, created);
+    }
+    private static bool CanBulkApprove(EntityMention mention) => !string.IsNullOrWhiteSpace(mention.Text) && mention.Text.Length <= 200;
+    private static IQueryable<EntityMention> FilterMentions(IQueryable<EntityMention> query, EntityType? type, string? search)
+    {
+        if (type.HasValue) query = query.Where(x => x.OriginalType == type);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToUpperInvariant();
+            query = query.Where(x => x.Text.ToUpper().Contains(term));
+        }
+        return query;
     }
     public async Task<MentionEvidence> EvidenceAsync(Guid id, CancellationToken ct)
     {

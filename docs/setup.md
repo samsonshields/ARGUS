@@ -96,6 +96,21 @@ proposals remain intact. The graph includes approved canonical entity nodes; **I
 proposed edges** immediately toggles relationship proposals, not unreviewed entity mentions.
 Approve source mentions, then generate co-mentions from Relationships to populate edges.
 
+To approve a whole candidate queue, select **PROPOSED** (or **All review statuses**),
+set any candidate type/text filters, then click **Bulk approve proposed candidates**.
+The preview covers all matching pages. On a source page it covers that source; from
+investigation Entities it covers the investigation. Check the count and click **Confirm
+bulk approval**, or cancel without changing data. Clear filters first to include everything.
+
+Optional **Group identical names and types within this batch** is off by default. It
+creates one new entity for repeated names after case/whitespace normalization; choose it
+only when those mentions refer to the same identity. Existing entities are never merged
+or reused by bulk approval. Each mention keeps its original evidence. Reviewed/rejected
+records are preserved, and names requiring individual correction remain proposed with
+a skipped count. Batches over 5000 matching proposals need narrower source/type/text filters.
+If another review changes a selected candidate, preview again; the stale batch changes
+nothing. Then use Relationships to generate co-mentions for the newly approved entities.
+
 To independently validate migration consistency and NuGet advisories:
 
 ```powershell

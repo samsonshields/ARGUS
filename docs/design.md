@@ -67,3 +67,20 @@ motion and forced colors are respected; there is no page-load animation.
 The marking text comes from `Workstation:Marking` in the Web app settings; an empty value hides
 it. The default describes the local workspace content (open-source research) and is not a
 classification decision about imported material.
+
+## Alignment correction (2026-11-12)
+
+Keep the existing palette, typefaces, navigation and panel treatments. Side-by-side
+review columns share one top edge: the first list heading/record and first inspector
+or empty state start at the grid's top, with section spacing retained between later
+blocks. Apply this shared rule to claims, chronology, locations and relationships.
+Source import keeps the browser's inline filename and removes the duplicate caption;
+file selection must not change the alignment of the adjacent input-method field.
+Form fields keep their contents at the top of each grid cell so a taller native file
+control or validation message does not stretch adjacent labels and move their controls.
+Check empty and selected inspectors, other two-column views, and stacked mobile layouts
+in the actual browser before considering additional spacing changes.
+
+Claims follow-up: place the Claims heading above the review row, keeping its count
+over the left column. Align the claim list/empty-state box with the inspector box,
+not the heading with the inspector border. Keep the heading full width when stacked.

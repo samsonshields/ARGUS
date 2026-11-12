@@ -133,6 +133,8 @@ array contracts remain unchanged for compatibility. Ordering is deterministic.
 | GET | /mentions/{id}/evidence | mention + before/quote/after + immutable textHash |
 | GET | /mentions/{id}/suggestions | up to 10 same-type name/alias matches; never automatically merged |
 | POST | /mentions/{id}/approve | 200 approved entity; 409 if already reviewed |
+| GET | /investigations/{id}/mentions/bulk-approval-preview?sourceId=&type=&search= | all matching proposed IDs/counts across pages; read-only |
+| POST | /investigations/{id}/mentions/approve-bulk | confirmed atomic approval of previewed IDs |
 | POST | /mentions/{id}/reject | 204; 409 if already reviewed |
 | GET | /investigations/{id}/entities?search=&page=1&pageSize=50 | paged active approved canonical entities |
 | GET | /entities/{id} | canonical record, aliases, approved mention count and optional mergedIntoId |
@@ -162,6 +164,32 @@ the mention with an active canonical record in the same investigation; name/type
 must match that record. Otherwise a new entity is created even for identical names.
 Original mention text/type/model provenance are never overwritten by corrections.
 PUT entity accepts name/type only. Mentions keep their original evidence after renames.
+
+Bulk preview uses the same original-type/text filters and optional source scope as the
+review list, always limited to PROPOSED mentions. Source scope must belong to the route's
+investigation. It returns `candidateIds`, `proposedCount`, `skippedCount` and
+`distinctNameTypeCount` (case/whitespace-normalized name plus original type). Candidates
+with blank names or names longer than 200 UTF-16 units are excluded from candidateIds
+and counted as skipped; they need an individual canonical-name correction. Over 5000
+matching proposals returns 413 with a request to narrow filters, never a partial preview.
+
+Bulk approval JSON: `{ "candidateIds": ["<GUID>"], "confirm": true,
+"groupIdenticalNames": false }`. IDs must be 1–5000 distinct, nonempty GUIDs within the
+route investigation. Only these IDs are processed, so new proposals arriving after a
+preview are not silently added. A missing/foreign ID returns 404; any already reviewed
+candidate returns 409; invalid/unconfirmed input returns 400. Validation completes before
+changes; approval, new entities and audit records commit together in one transaction.
+
+Default behavior creates one new canonical entity per mention using its original text
+and model type. Explicit grouping creates one new entity per normalized name/type within
+this batch. It never matches aliases, reuses existing canonical entities or merges them.
+Names alone do not establish identity; grouping requires the analyst's explicit choice.
+Every mention retains its own text, snapshot, model metadata and UTF-16 span, with a UTC
+review timestamp. Existing approvals/rejections are unchanged. Per-mention `BulkApproved`
+audits share a batch GUID and a summary records counts and the grouping choice.
+The response is `{ "batchId": "<GUID>", "approvedCount": 42, "createdEntityCount": 8 }`.
+Replaying a completed batch returns 409 without creating duplicate entities.
+Relationships still require explicit co-mention generation; bulk approval creates no edges.
 
 Merge request: `{ "sourceId": "<entity GUID>", "targetId": "<entity GUID>", "confirm": true }`.
 Source and target must be different, active, of the same type and investigation.

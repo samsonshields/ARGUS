@@ -218,7 +218,7 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .editor.grid-2 > label:has(textarea), .editor.grid-2 > label:has(> input[type=checkbox]),
 .editor.grid-2 > p, .editor.grid-2 > .actions, .editor.grid-2 > .validation-errors, .editor.grid-2 > .span-all { grid-column: 1 / -1; }
 .editor.grid-2 > button { margin-top: 0; }
-.field { display: grid; gap: 0; }
+.field { display: grid; align-content: start; gap: 0; }
 .field > label { margin: 0; }
 .field.wide { grid-column: 1 / -1; }
 .form-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
@@ -361,10 +361,13 @@ mark { background: rgba(246, 183, 4, .22); color: var(--ink); padding: 1px 3px; 
 /* ---------- Review layout (list + inspector) ---------- */
 .review-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(420px, 46%); gap: 28px; align-items: start; }
 .review-layout > * { min-width: 0; }
-.review-layout .inspector { position: sticky; top: calc(var(--stick) + var(--topbar-height) + 16px); max-height: calc(100vh - var(--stick) - var(--topbar-height) - 32px); overflow: auto; margin: 14px 0; }
-.inspector-empty { margin: 14px 0; }
+.claims-heading { margin-top: 0; width: calc(54% - 28px); }
+/* Columns share a top edge; section spacing belongs between later blocks. */
+.review-layout > :first-child > :first-child { margin-top: 0; }
+.review-layout .inspector { position: sticky; top: calc(var(--stick) + var(--topbar-height) + 16px); max-height: calc(100vh - var(--stick) - var(--topbar-height) - 32px); overflow: auto; margin: 0; }
+.inspector-empty { margin: 0; }
 .inspector h2 { margin-top: 0; }
-.inspector-column > .panel:first-child, .inspector-column > .empty:first-child { margin-top: 14px; }
+.inspector-column > .panel:first-child, .inspector-column > .empty:first-child { margin-top: 0; }
 .review-decision { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--rule); }
 .review-decision h3 { margin-top: 0; }
 .inspector .meta { margin: -2px 0 12px; }
@@ -486,6 +489,7 @@ details.disclosure label { margin-top: 12px; }
 /* ---------- Responsive ---------- */
 @media (max-width: 1280px) {
     .review-layout { grid-template-columns: minmax(0, 1fr); }
+    .claims-heading { width: auto; }
     .review-layout .inspector { position: static; max-height: none; }
     .inspector-empty { display: none; }
     .graph-layout { grid-template-columns: minmax(0, 1fr); }

@@ -42,6 +42,7 @@ for entity merge, graph/timeline/map exploration, contradictory claims, reportin
   extraction limits and byte-identical downloads.
 - Local English entity recognition with persistent jobs, bounded retries, cancellation,
   recovery and proposed/approved/rejected review. Corrections/merges retain provenance.
+  Bulk approval previews all matching pages, with optional grouping of identical names/types.
 - Exact snapshot citations and deterministic co-mention proposals; reviewed relationships,
   graph filters, metrics, neighbor exploration and shortest paths.
 - Manual/generated events with exact/month/year/unknown dates and chronological filters.

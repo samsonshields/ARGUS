@@ -45,6 +45,7 @@ internal static class IntelligenceSchema
         mention.Property(x => x.Status).HasConversion<string>();
         mention.Property(x => x.OriginalType).HasConversion<string>();
         mention.Property(x => x.Revision).IsConcurrencyToken();
+        mention.Property(x => x.ReviewedAt).HasConversion(v => v, v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : null);
         mention.HasIndex(x => new { x.SnapshotId, x.Start, x.End, x.OriginalType }).IsUnique();
         mention.HasIndex(x => new { x.InvestigationId, x.Status });
         mention.HasIndex(x => new { x.EntityId, x.Status });

@@ -31,6 +31,14 @@ public sealed class ApproveMentionRequest : EntityEditRequest
 {
     public Guid? EntityId { get; set; }
 }
+public sealed record BulkMentionPreview(IReadOnlyList<Guid> CandidateIds, int ProposedCount, int SkippedCount, int DistinctNameTypeCount);
+public sealed record BulkMentionApprovalResult(Guid BatchId, int ApprovedCount, int CreatedEntityCount);
+public sealed class BulkApproveMentionsRequest
+{
+    [Required, MinLength(1), MaxLength(5000)] public Guid[] CandidateIds { get; set; } = [];
+    public bool Confirm { get; set; }
+    public bool GroupIdenticalNames { get; set; }
+}
 public sealed class MergeEntitiesRequest
 {
     public Guid SourceId { get; set; }

@@ -523,3 +523,114 @@ To use the correction, stop the current API/Web processes before rebuilding thei
 configuration, then restart API, Web and NLP. No migration or data deletion is needed.
 The English model still produces false positives and omissions: review/correct its findings;
 ordinary source text is preserved in Extracted text even when not recognized as a candidate.
+
+## Post-Phase 7: bulk candidate approval
+
+Completed on 2026-11-12 (America/New_York). Added an explicit analyst action to approve
+matching proposed entity mentions across every page, preserving the defense-focused UI
+styling and the API/Core/Infrastructure separation.
+
+- Source review scopes the batch to that source; investigation Entities scopes it to the
+  investigation. Existing candidate type/text filters apply. A read-only preview lists
+  the eligible count before a separate confirmation; cancel changes nothing.
+- Optional grouping is off by default. Explicit grouping creates one new entity per
+  case/whitespace-normalized name and original type within the selected batch. Default
+  behavior creates one new entity per mention. Neither option reuses or merges existing
+  entities or fuzzy/alias matches. The preview shows the resulting entity count.
+- Confirmation freezes the selected IDs. New proposals arriving afterward are excluded;
+  a stale, reviewed, missing or foreign selection rejects the entire batch. A single
+  transaction commits approval, canonical records, per-mention audits and a batch summary.
+- Approved/rejected decisions remain intact. Original text, model labels, snapshot hashes
+  and exact UTF-16 passages are retained. Reviewed timestamps materialize as UTC (a test
+  caught the existing missing DateTime-kind converter; no DDL migration is needed).
+- Limits: 5000 matching proposals per preview/request. Narrow filters above that bound.
+  Blank or over-200-unit names are counted as skipped and remain proposed for individual
+  canonical-name correction. Repeat submission of an approved batch returns 409.
+- Added preview/approval API contracts, typed Web client methods and existing-style UI
+  controls; no CSS, font, color, graph rendering or portfolio screenshot changes.
+- Extended the existing candidate-review browser smoke, including optional local-PDF
+  import/bulk approval. Updated README, setup and API documentation.
+
+Verification:
+
+- Debug build: passed with zero warnings/errors; running Release processes were not stopped.
+- **179 .NET tests passed** (79 unit, 100 integration), including eleven new bulk cases.
+  **64 Python tests passed**. Total: **243 passed**, zero failures/skips. The existing
+  upstream Starlette/httpx test-client deprecation warning remains.
+- Tests cover all-page approval, opt-in normalized grouping, type separation, no reuse
+  of prior canonical entities, source/type/search filters, preserved decisions and exact
+  provenance, UTC review timestamps, shared audit batch IDs, restart persistence, stale
+  selection rollback, duplicate/empty/unconfirmed/foreign/missing/overlong selections,
+  candidates arriving after preview and the 5000-record boundary.
+- Real Edge/API/spaCy workflow passed preview/cancel, filter-change cancellation, default
+  ungrouped counts, optional grouping and approval of 72 mentions across multiple pages
+  into three new entities while preserving existing approved/rejected findings. Capture:
+  `.local/bulk-approval-complete.png`.
+- An isolated copy of the supplied DNI PDF passed actual import/extraction and approval
+  of all **1130 mentions into 391 entities** with explicit grouping. The difference from
+  396 raw text/type pairs reflects case/whitespace normalization. Normal investigation
+  data and the supplied original file were not modified.
+- EF model consistency: no pending changes. .NET format, Ruff lint/format and
+  `git diff --check`: passed. No dependency or database migration was added.
+- All temporary browser/API/NLP instances stopped afterward. Unrelated live smoke suites
+  were not repeated for this addition. Source changes remain uncommitted for review.
+
+Rebuild the configuration used by your running services and restart API/Web to use the
+feature. Bulk approval retains the model's proposed classifications; it does not validate
+their factual accuracy. Relationship generation stays an explicit subsequent action.
+
+## Post-Phase 7: container and source-import alignment
+
+Completed on 2026-11-12 (America/New_York), preserving the existing defense-focused
+palette, typography, panel styling and navigation.
+
+- Removed inconsistent first-child margins from the shared list/inspector layout.
+  Claims, chronology and location review headings previously started 26 pixels below
+  the neighboring empty/selected inspector. Both columns now share the same top edge;
+  relationship review uses the same rule. Later section spacing and responsive stacking
+  retain their existing behavior.
+- Removed the redundant selected-filename/byte-count paragraph from source import.
+  The browser's existing inline filename beside Choose File remains available.
+- Anchored form-field contents to the top of their grid cells. This also eliminates
+  the remaining 2.17-pixel control offset caused by a taller native file input stretching
+  the adjacent input-method field.
+- Updated design notes. This correction changes only app.css and SourceLibrary.razor;
+  earlier bulk-approval work remains intact.
+
+Verification:
+
+- Debug Web build passed with zero warnings/errors; .NET formatting and
+  `git diff --check` passed.
+- Isolated real API/Web/NLP services loaded fictional Operation Meridian for an Edge
+  browser audit. Seventeen desktop layout states passed with zero top-edge difference:
+  populated/empty/selected claims, timeline, locations and relationships; investigation
+  overview, source detail, entity detail, report history and workspace backup.
+- Actual file selection retained native `d01.txt`, rendered no duplicate caption,
+  preserved automatic title population and caused zero vertical movement. File and
+  input-method controls had identical top coordinates after selection.
+- Eighteen additional responsive page checks passed at 1100, 768 and 390 pixels across
+  assessments, timeline, geography, relationships, source library and reports, with no
+  horizontal page overflow. Desktop and mobile screenshots were inspected under ignored
+  `.local/layout-after-*`; geometry is in `.local/layout-after-results.json`.
+- The audit used temporary ports/data and stopped its own services afterward. Existing
+  user services, investigation data and portfolio screenshots were left untouched.
+  Backend/Python unit suites were not repeated for this CSS/markup-only correction;
+  other browser engines and physical mobile devices remain unverified.
+
+Rebuild/restart Web in the configuration you use, then refresh the browser to load
+the corrected styles and source-import markup.
+
+### Claims alignment follow-up
+
+The running app confirmed the previous CSS was loaded, but the earlier check aligned
+the Claims heading with the inspector border rather than aligning the two content
+boxes. Moved the Claims heading above the review row, retaining the count over the
+left column and full-width heading on stacked screens. No data or theme changes.
+Debug Web build passed with zero warnings/errors. Browser verification uses the
+content boxes as the alignment target; backend/Python suites are not repeated for
+this markup/CSS correction. Release Web build also passed with zero warnings/errors;
+formatting and diff checks passed. An Edge HTML/CSS fixture confirmed matching content
+box tops (183px each). Full application retesting was blocked by Windows Event Log
+errors in temporary services; the existing running app was inspected read-only before
+the correction. Responsive application behavior and the selected inspector were not
+reverified in this follow-up.

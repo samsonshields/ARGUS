@@ -25,8 +25,7 @@ else if (investigation is not null && limits is not null)
                 <select id="input-kind" @bind="inputKind" disabled="@importing"><option value="file">Upload file</option><option value="paste">Paste text</option></select></div>
             @if (inputKind == "file")
             {
-                <div class="field"><label for="source-file">Document (.txt or .pdf)</label><InputFile id="source-file" OnChange="SelectFile" accept=".txt,.pdf" disabled="@importing" />
-                @if (file is not null) { <p class="muted">@file.Name (@file.Size bytes)</p> }</div>
+                <div class="field"><label for="source-file">Document (.txt or .pdf)</label><InputFile id="source-file" OnChange="SelectFile" accept=".txt,.pdf" disabled="@importing" /></div>
             }
             else
             {

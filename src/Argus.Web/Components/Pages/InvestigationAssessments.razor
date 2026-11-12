@@ -29,12 +29,15 @@
     <label>Statement search<input aria-label="Claim statement search" @bind="search" maxlength="200" /></label>
     <label><input type="checkbox" @bind="unresolved" />Unresolved contradictions only</label><button @onclick="FilterAsync">Apply claim filters</button>
 </fieldset>
+@if (items is not null)
+{
+    <div class="section-head claims-heading"><h2>Claims</h2><span class="count">@items.Total claims, page @(page)</span></div>
+}
 <div class="review-layout">
 <div>
 @if (items is null && error is null) { <p role="status">Loading assessments…</p> }
 else if (items is not null)
 {
-    <div class="section-head"><h2>Claims</h2><span class="count">@items.Total claims, page @(page)</span></div>
     @if (items.Total == 0) { <div class="empty"><strong>No claims match these filters</strong>Create a claim and attach specific source passages.</div> }
     else
     {

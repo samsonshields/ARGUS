@@ -32,6 +32,10 @@ public sealed class IntelligenceApiClient(HttpClient http)
     public async Task<List<EntitySuggestion>> SuggestionsAsync(Guid id) => await ReadAsync<List<EntitySuggestion>>(await http.GetAsync($"api/v1/mentions/{id}/suggestions"));
     public async Task<EntityResponse> ApproveAsync(Guid id, ApproveMentionRequest request)
         => await ReadAsync<EntityResponse>(await http.PostAsJsonAsync($"api/v1/mentions/{id}/approve", request, InvestigationClient.Json));
+    public async Task<BulkMentionPreview> BulkPreviewAsync(Guid investigationId, Guid? sourceId, string type, string search)
+        => await ReadAsync<BulkMentionPreview>(await http.GetAsync($"api/v1/investigations/{investigationId}/mentions/bulk-approval-preview?sourceId={sourceId}&type={type}&search={Uri.EscapeDataString(search)}"));
+    public async Task<BulkMentionApprovalResult> BulkApproveAsync(Guid investigationId, BulkApproveMentionsRequest request)
+        => await ReadAsync<BulkMentionApprovalResult>(await http.PostAsJsonAsync($"api/v1/investigations/{investigationId}/mentions/approve-bulk", request, InvestigationClient.Json));
     public async Task RejectAsync(Guid id)
     {
         using var response = await http.PostAsync($"api/v1/mentions/{id}/reject", null);

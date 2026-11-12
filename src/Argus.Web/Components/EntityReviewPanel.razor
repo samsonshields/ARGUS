@@ -8,9 +8,26 @@
         <label>Review status<select aria-label="Review status" @bind="status" @bind:after="RefreshAsync" disabled="@busy"><option value="">All review statuses</option><option>PROPOSED</option><option>APPROVED</option><option>REJECTED</option></select></label>
         <label>Candidate type<select aria-label="Candidate type" @bind="type" @bind:after="RefreshAsync" disabled="@busy"><option value="">All candidate types</option>
             @foreach (var candidateType in Enum.GetValues<EntityType>()) { <option>@candidateType</option> }</select></label>
-        <label>Candidate text<input aria-label="Candidate text" @bind="search" maxlength="200" placeholder="Search extracted mentions" /></label>
+        <label>Candidate text<input aria-label="Candidate text" @bind="search" @bind:after="CancelBulk" disabled="@busy" maxlength="200" placeholder="Search extracted mentions" /></label>
         <button type="submit" disabled="@busy">Refresh candidates</button></form>
     <p class="muted">Each row is a source occurrence, so repeated names have separate evidence. Approved and rejected mentions remain available through Review status; all other source text remains in Extracted text.</p>
+    @if (status is "PROPOSED" or "")
+    {
+        <div class="actions"><button disabled="@(busy || items is null || items.Total == 0)" @onclick="PreviewBulkAsync">Bulk approve proposed candidates</button></div>
+    }
+    @if (bulkPreview is not null)
+    {
+        <section class="panel" aria-label="Bulk approval confirmation">
+            <h3>Confirm bulk approval</h3>
+            <p>Approve <strong>@bulkPreview.CandidateIds.Count proposed mentions</strong> across all pages in @(SourceId.HasValue ? "this source" : "this investigation"), using the current candidate type and text filters.</p>
+            <p>Each candidate keeps its model classification and source evidence. Existing approvals and rejections remain unchanged.</p>
+            @if (bulkPreview.SkippedCount > 0) { <p role="status">@bulkPreview.SkippedCount candidates need an individual canonical-name correction and will remain proposed.</p> }
+            <label><input type="checkbox" @bind="groupIdenticalNames" disabled="@busy" /> Group identical names and types within this batch</label>
+            <p class="muted">Create @(groupIdenticalNames ? bulkPreview.DistinctNameTypeCount : bulkPreview.CandidateIds.Count) new entities. Grouping ignores name case and extra whitespace; select it only when these repeated mentions identify the same entities. Existing entities are not merged or reused.</p>
+            <div class="actions"><button class="primary" disabled="@(busy || bulkPreview.CandidateIds.Count == 0)" @onclick="ConfirmBulkAsync">Confirm bulk approval</button>
+                <button disabled="@busy" @onclick="CancelBulk">Cancel bulk approval</button></div>
+        </section>
+    }
     @if (items is null && error is null) { <p role="status">Loading candidates…</p> }
     else if (items is not null)
     {
@@ -62,6 +79,8 @@
     private ApproveMentionRequest approval = new();
     private string status = "PROPOSED", selectedEntity = "", type = "", search = "";
     private string? error, success;
+    private BulkMentionPreview? bulkPreview;
+    private bool groupIdenticalNames;
     private int page = 1, loadVersion;
     private bool busy, interactive;
     protected override Task OnInitializedAsync() => ReloadAsync();
@@ -83,11 +102,36 @@
         catch (HttpRequestException ex) { if (version == loadVersion) error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { if (version == loadVersion) error = "Review list timed out. Refresh to retry."; }
     }
-    private async Task RefreshAsync() { page = 1; items = null; evidence = null; error = success = null; await ReloadAsync(); }
-    private async Task PageAsync(int delta) { page += delta; evidence = null; await ReloadAsync(); }
+    private void CancelBulk() => bulkPreview = null;
+    private async Task PreviewBulkAsync()
+    {
+        if (busy) return;
+        busy = true; error = success = null; evidence = null; bulkPreview = null; groupIdenticalNames = false;
+        try { bulkPreview = await Client.BulkPreviewAsync(InvestigationId, SourceId, type, search); }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
+        catch (TaskCanceledException) { error = "Bulk preview timed out. Try a narrower filter."; }
+        finally { busy = false; }
+    }
+    private async Task ConfirmBulkAsync()
+    {
+        if (bulkPreview is null || busy) return;
+        busy = true; error = success = null;
+        try
+        {
+            var result = await Client.BulkApproveAsync(InvestigationId, new() { CandidateIds = bulkPreview.CandidateIds.ToArray(), Confirm = true, GroupIdenticalNames = groupIdenticalNames });
+            bulkPreview = null; evidence = null; page = 1;
+            success = $"Bulk approval complete: {result.ApprovedCount} mentions approved; {result.CreatedEntityCount} entities created.";
+            await ReloadAsync(); await Reviewed.InvokeAsync();
+        }
+        catch (HttpRequestException ex) { bulkPreview = null; await ReloadAsync(); error = ClientErrors.Describe(ex); }
+        catch (TaskCanceledException) { bulkPreview = null; await ReloadAsync(); error = "Bulk approval timed out. Refresh and check review statuses before retrying."; }
+        finally { busy = false; }
+    }
+    private async Task RefreshAsync() { CancelBulk(); page = 1; items = null; evidence = null; error = success = null; await ReloadAsync(); }
+    private async Task PageAsync(int delta) { CancelBulk(); page += delta; evidence = null; await ReloadAsync(); }
     private async Task SelectAsync(Guid id)
     {
-        busy = true; error = success = null;
+        CancelBulk(); busy = true; error = success = null;
         try
         {
             evidence = await Client.EvidenceAsync(id);

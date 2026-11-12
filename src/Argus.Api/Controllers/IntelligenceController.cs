@@ -48,6 +48,16 @@ public sealed class IntelligenceController(ProcessingJobService jobs, EntityRevi
     }
     [HttpGet("mentions/{id:guid}/evidence")]
     public Task<MentionEvidence> Evidence(Guid id, CancellationToken ct) => review.EvidenceAsync(id, ct);
+    [HttpGet("investigations/{id:guid}/mentions/bulk-approval-preview")]
+    public async Task<ActionResult<BulkMentionPreview>> BulkPreview(Guid id, [FromQuery] Guid? sourceId,
+        [FromQuery] EntityType? type, [FromQuery, StringLength(200)] string? search, CancellationToken ct)
+    {
+        if (type.HasValue && !Enum.IsDefined(type.Value)) return Problem(statusCode: 400, title: "Invalid entity type.");
+        return Ok(await review.PreviewBulkApprovalAsync(id, sourceId, type, search, ct));
+    }
+    [HttpPost("investigations/{id:guid}/mentions/approve-bulk")]
+    public Task<BulkMentionApprovalResult> BulkApprove(Guid id, BulkApproveMentionsRequest request, CancellationToken ct)
+        => review.BulkApproveAsync(id, request, ct);
     [HttpGet("mentions/{id:guid}/suggestions")]
     public Task<List<EntitySuggestion>> Suggestions(Guid id, CancellationToken ct) => review.SuggestionsAsync(id, ct);
     [HttpPost("mentions/{id:guid}/approve")]
