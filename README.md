@@ -1,10 +1,11 @@
 # ARGUS
 
-Local-first OSINT analysis workstation for Windows. Phases 1–4 provide investigations,
+Local-first OSINT analysis workstation for Windows. Phases 1-5 provide investigations,
 preserved source documents, asynchronous local entity recognition and analyst review.
 Approve/correct/reject mentions, inspect exact source evidence, associate mentions
 with existing entities and explicitly merge duplicate records. Explore evidence-linked
-relationship graphs and review sentence co-mentions. **Phase 5 has not begun.**
+relationship graphs and review sentence co-mentions. Build reviewed timelines and
+geographic views with precise source citations. **Phase 6 has not begun.**
 
 ## Requirements
 
@@ -79,6 +80,7 @@ dotnet format Argus.sln --no-restore --verify-no-changes
 python scripts/smoke.py
 python scripts/smoke_nlp.py
 intelligence-service/.venv/Scripts/python.exe scripts/smoke_graph.py
+intelligence-service/.venv/Scripts/python.exe scripts/smoke_temporal.py
 intelligence-service/.venv/Scripts/python.exe -m pytest intelligence-service/tests -q -c intelligence-service/pyproject.toml
 intelligence-service/.venv/Scripts/python.exe -m ruff check intelligence-service/app intelligence-service/tests
 intelligence-service/.venv/Scripts/python.exe -m ruff format --check intelligence-service/app intelligence-service/tests
@@ -237,8 +239,58 @@ total generation deadline. Existing NLP HTTP/input/response/retry limits still a
 
 Manual Phase 4 check: approve two entities in one source sentence, generate proposals,
 inspect/review a citation, compare proposed versus reviewed edge styles, filter, select
-a node, expand neighbors, highlight a path, restart and reopen the evidence. No timeline,
-geographic/event processing, maps or Phase 5 endpoints are implemented.
+a node, expand neighbors, highlight a path, restart and reopen the evidence.
+
+## Timeline and geography
+
+Open an investigation and choose **Timeline and event review**. Select a source under
+**Extract date candidates**, queue extraction, monitor **Processing jobs**, then select
+Proposed and refresh. A completed entity/text job must precede event extraction.
+Alternatively choose **Create event**, enter a title, type and explicit date precision.
+Date mentions remain proposals until you inspect the source and approve them.
+
+EXACT uses yyyy-MM-dd (with an optional end date), MONTH uses yyyy-MM, YEAR uses yyyy,
+and UNKNOWN keeps both fields empty. Relative phrases and ambiguous slash dates stay
+unknown; no reference date, locale or missing year is invented. Month/year events retain
+their precision on the timeline. Filters use possible date overlap and can explicitly
+include unknown dates. Select a row to read preserved citations, associate entities or
+an approved location, correct the date/title, reject or confirm removal. Add a source
+passage before approving manual events. Corrections and citation changes return records
+to Proposed; approval then updates the visible timeline without restarting.
+
+Open **Geography and locations** to create a profile for an approved LOCATION entity.
+Find/select the entity, choose UNKNOWN, APPROXIMATE or EXACT precision, and enter
+explicitly selected or source-verified coordinates. Approximate locations need an
+uncertainty radius in metres; unknown locations must have no coordinates. Explain the
+basis, confirm coordinates, save, add a source citation, then explicitly approve.
+Clicking the map copies coordinates into a draft only. No automatic geocoding runs.
+
+The map plots approved known locations and approved events linked to those locations.
+Amber circles show uncertainty; purple rings identify events. Select a marker or use the
+keyboard selector to open citations and navigate to sources, entities or the timeline.
+Event date/type filters affect event rings; location entities stay visible. Pan/zoom and
+**Save current geographic focus** persist a preferred viewport. Retiring/correcting a
+profile hides its markers until reviewed again while preserving event/source history.
+Merging two entities with active profiles requires explicitly retiring one profile first.
+
+Leaflet 1.9.4 is vendored locally. The default coordinate grid and all reviewed markers
+work offline. **Load OpenStreetMap basemap (online)** explicitly enables external viewport
+tile requests with attribution and browser caching; tiles are not bulk-downloaded.
+An unavailable tile service leaves the grid and markers usable. This optional mode
+reveals the viewed area to the tile provider. See [temporal/geographic contracts](docs/temporal-contracts.md)
+for rules, limits, APIs and the linked provider policy.
+
+`smoke_temporal.py` launches three isolated real processes and headless Edge, drives
+review/date edits/map selection/filtering/draft coordinates, verifies exact citations,
+unknown dates, optional tile failure, deduplication and restart persistence. It blocks
+external requests; successful online tile imagery is therefore not verified. Screenshots
+and logs are ignored under `.local/phase5-*.png` and `.local/smoke-temporal.log`.
+Verified Phase 5 gate: 130 .NET tests (67 unit/63 integration) and 53 Python tests passed;
+Release build had zero warnings/errors. Formatting, lint, migration consistency, NuGet
+vulnerability audit, dependency checks and all four live smoke workflows passed. Browser
+coverage targets Edge desktop; the Python test client emits one upstream deprecation warning.
+See the [development plan](docs/development-plan.md) for the complete verification record.
+Restart API, Web and Python after rebuilding to load Phase 5 and apply its migration.
 
 ## Structure
 
@@ -259,8 +311,8 @@ Microsoft.OpenApi is pinned to patched 2.7.5 rather than the vulnerable transiti
 The graph workflow has automated Edge browser coverage and screenshots. Broader
 file-selection/entity-review UI workflows retain their manual checklists. English NER is
 model-dependent and may miss or misclassify entities. Python test tooling currently
-emits one upstream httpx deprecation warning; tests still pass. Timelines, maps and
-assessments remain deferred.
+emits one upstream httpx deprecation warning; tests still pass. Assessments and reports
+remain deferred to Phase 6.
 
 See [specification](docs/project_specifications.md), [architecture](docs/architecture.md),
 [API contracts](docs/api-contracts.md), [schema](docs/database-schema.md) and

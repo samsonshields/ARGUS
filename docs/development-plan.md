@@ -1,6 +1,6 @@
 # ARGUS development plan
 
-Current scope: Phases 1–4. Phase 5 has not begun.
+Current scope: Phases 1-5. Phase 6 has not begun.
 
 ## Phase 1 implementation
 
@@ -215,5 +215,78 @@ completion gate passed; restart API, Web and Python to load the new implementati
 - Browser verification targets Edge desktop graph workflows, not every browser/device or earlier upload workflow.
 - Existing no-authentication/no-OCR/crash-orphan constraints and one upstream Python test-client warning remain.
 
-Next: await authorization for Phase 5. No timelines, event/date-resolution pipelines,
-geographic locations, maps, Leaflet integration or Phase 5 APIs were started.
+Phase 5 was subsequently authorized and is recorded below.
+
+## Phase 5 implementation
+
+- [x] Re-read scope, inspect repository and verify .NET/Python toolchains.
+- [x] Add event/evidence/entity association, location/evidence and geographic focus models.
+- [x] Add additive TimelineGeography migration, constrained references and review concurrency.
+- [x] Implement deterministic English/ISO date candidates with exact UTF-16 sentence citations.
+- [x] Preserve unknown/relative/ambiguous dates; independently validate Python contracts in .NET.
+- [x] Extend persistent jobs with EVENTS, bounded transport/retry/cancel/recovery and atomic results.
+- [x] Implement manual events, corrections, explicit review, soft removal and stable reruns.
+- [x] Implement source passage selection, immutable citation reconstruction and entity associations.
+- [x] Implement paginated timeline, precision labels, date overlap and type/status filters.
+- [x] Add explicitly selected/source-verified location profiles, review and uncertainty radii.
+- [x] Preserve event/profile links on merges and reject unresolved conflicting profiles.
+- [x] Vendor verified Leaflet 1.9.4, license, images and package integrity metadata.
+- [x] Add offline grid, reviewed location/event markers, selection, citations and saved focus.
+- [x] Add opt-in online OSM tiles with attribution, browser caching and offline failure fallback.
+- [x] Add domain/API/Python tests including uncertain dates/places and Phase 4 migration upgrade.
+- [x] Exercise real timeline/map workflows in headless Edge and inspect screenshots.
+- [x] Update README, architecture, schema and temporal/API/NLP contract documentation.
+- [x] Record final build/test/format/lint/migration/audit and regression smoke results.
+
+## Phase 5 final verification
+
+Verified on 2026-11-11 (America/New_York): .NET SDK 10.0.102/runtime 10.0.2,
+Python 3.14.6, Node 24.18.1; existing installed spaCy/FastAPI/model stack unchanged.
+Leaflet 1.9.4 npm tarball integrity was checked before vendoring; JS SHA-256 and the
+original license are preserved in wwwroot/vendor/leaflet. OSM tile policy was checked.
+
+- Final sequential `dotnet build Argus.sln -c Release --no-restore`: passed, zero warnings/errors.
+- `dotnet test Argus.sln -c Release --no-build --no-restore`: **130 passed** (67 unit, 63 integration), zero failures/skips.
+- Python pytest: **53 passed**, including date precision, ambiguous/relative/invalid dates,
+  exact Unicode quotes, missing NER weights, limits and sanitized failures.
+- Total automated unit/integration/Python tests: **183 passed**.
+- .NET formatting verification: passed. Ruff lint/format, Python syntax and both application JavaScript syntax checks: passed.
+- EF `has-pending-model-changes`: no model drift. Phase 4 migration upgrade preserves relationships/sources.
+- First event job snapshot creation/cancellation, late result cancellation, retry/recovery,
+  stale review prevention, cross-investigation rejection, merge collisions and removed-candidate reruns: passed.
+- NuGet transitive vulnerability audit: no known vulnerable packages reported; `pip check`: no broken requirements.
+- Earlier-phase live API/Web/source and real NLP outage/retry/restart smokes: passed.
+- Phase 4 real Edge graph regression: 100 nodes / 300 edges; render 308 ms, initial load
+  1412 ms on this machine. Existing graph performance and interactions remain passing.
+- Phase 5 real three-process Edge smoke: passed timeline review, entity/source links,
+  date correction without restart, precise/partial/unknown dates, offline Leaflet marker
+  and uncertainty rendering, actual SVG marker click, keyboard selection, event filtering,
+  draft-only map coordinate selection, location edits/reapproval, saved geographic focus,
+  optional online tile failure/attribution, safe text labels, stable reruns and API restart persistence.
+- Final screenshots inspected: `.local/phase5-timeline.png` and `.local/phase5-map.png`.
+  Logs/screenshots/test data remain ignored. Temporary verification servers were stopped.
+- Existing normal application instances/default databases were not used or replaced.
+
+The initial verification caught and fixed an approved-only default obscuring the all-status
+query, ASP.NET positional-record validation, an upstream OpenAPI nullable-enum default
+serialization issue, circuit-readiness timing and accessible select names. The complete
+final suite passes. No warning suppression or incomplete gate was used.
+
+Phase 5 completion gate passed. Phase 6 remains unauthorized and has not been started.
+
+## Phase 5 known limits and next steps
+
+- Date detection is deliberately conservative English/ISO mention extraction, not semantic
+  event verification. Relative dates, ambiguous numeric dates and missing years stay unknown;
+  analysts can make explicit corrections. Time-of-day resolution is not implemented.
+- Offline maps use a coordinate grid rather than cached geographic imagery. Optional online
+  OSM imagery needs internet and exposes the viewport to the provider; automated checks block
+  external requests and verify failure fallback/attribution, not successful imagery delivery.
+- Timeline is paginated; map/location bounds are 2000 known/active profiles and 2000 event
+  markers, with explicit overflow errors. One API/worker per SQLite database remains required.
+- Removed finding/citation history remains in SQLite/audit records; removed findings have no
+  restore/history browser workflow. Existing no-authentication/no-OCR/crash-orphan limits remain.
+- One upstream Starlette/httpx test-client deprecation warning persists; runtime/tests pass.
+- Restart API, Web and Python after building to load Phase 5 and apply the additive migration.
+  Await user authorization before Phase 6 assessments/reports.
+

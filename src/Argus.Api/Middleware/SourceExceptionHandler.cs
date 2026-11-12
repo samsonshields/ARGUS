@@ -7,6 +7,16 @@ public sealed class SourceExceptionHandler : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext context, Exception exception, CancellationToken ct)
     {
+        if (exception is System.ComponentModel.DataAnnotations.ValidationException)
+        {
+            await Results.Problem(statusCode: 400, title: exception.Message).ExecuteAsync(context);
+            return true;
+        }
+        if (exception is Microsoft.EntityFrameworkCore.DbUpdateException { InnerException: Microsoft.Data.Sqlite.SqliteException { SqliteErrorCode: 19 } })
+        {
+            await Results.Problem(statusCode: 409, title: "A linked or duplicate record changed. Reload before retrying.").ExecuteAsync(context);
+            return true;
+        }
         if (exception is Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
         {
             await Results.Problem(statusCode: 409, title: "The record changed concurrently. Reload and try again.",

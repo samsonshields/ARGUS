@@ -4,7 +4,8 @@ The independent Python service never opens or writes SQLite or source files. It
 receives exact extracted text over loopback HTTP and returns candidates only.
 Phase 3 endpoints are GET `/health` and POST `/process/entities`.
 Phase 4 adds POST `/process/relationships` as described in [graph contracts](graph-contracts.md).
-FastAPI serves `/openapi.json` and `/docs`; event processing is not implemented.
+Phase 5 adds POST `/process/events`; see [temporal contracts](temporal-contracts.md).
+FastAPI serves `/openapi.json` and `/docs`.
 
 Request: `contractVersion` = "1", `sourceId` = GUID string, `textHash` = lowercase
 SHA-256 of UTF-8 exact text, and `text` = the unchanged extracted string. Unknown
@@ -54,3 +55,10 @@ is used. Health 200 reports the actual loaded model version; health 503 is not r
 Python inference already in progress can finish after an HTTP timeout/cancellation.
 .NET bounds retries and discards results from cancelled jobs. This service is intended
 for a single local API instance and must remain bound to loopback.
+
+## Phase 5 date candidates
+
+`POST /process/events` uses the same version 1 hashed-text request and UTF-16 convention.
+It returns deterministic date mentions and enclosing sentences for analyst review,
+with exact/month/year/unknown precision and null confidence. See
+[temporal contracts](temporal-contracts.md) for response fields, supported formats and limits.

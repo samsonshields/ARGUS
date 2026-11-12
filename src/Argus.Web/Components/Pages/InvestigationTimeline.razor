@@ -1,0 +1,115 @@
+@page "/investigations/{Id:guid}/timeline"
+@rendermode InteractiveServer
+@using Argus.Core.Services
+@using Argus.Web.Components.Shared
+@inject TemporalApiClient Client
+@inject SourceClient Sources
+@inject IntelligenceApiClient Intelligence
+<PageTitle>ARGUS | Timeline</PageTitle>
+<a href="@($"/investigations/{Id}")">Investigation overview</a> · <a href="@($"/investigations/{Id}/map")">Geography</a>
+<p class="eyebrow">CHRONOLOGY / ANALYST REVIEW</p><h1>Investigation timeline</h1>
+<p class="muted">Month and year dates retain their precision. Unknown and relative dates remain unresolved. Edits require renewed approval.</p>
+@if (error is not null) { <p role="alert" class="error">@error</p> }
+@if (message is not null) { <p role="status" class="success">@message</p> }
+<fieldset class="filters graph-filters" disabled="@(!interactive || busy)" data-timeline-ready="@interactive.ToString().ToLowerInvariant()">
+    <label>Review status<select aria-label="Event review status" @bind="status"><option value="APPROVED">Approved</option><option value="PROPOSED">Proposed</option><option value="REJECTED">Rejected</option><option value="">All</option></select></label>
+    <label>Event type<select aria-label="Event type filter" @bind="type"><option value="">All types</option>@foreach (var t in Enum.GetValues<EventType>()) { <option>@t</option> }</select></label>
+    <label>From<input aria-label="Timeline from" type="date" value="@from" @onchange="e => from = e.Value?.ToString() ?? string.Empty" /></label><label>Through<input aria-label="Timeline through" type="date" value="@to" @onchange="e => to = e.Value?.ToString() ?? string.Empty" /></label>
+    <label><input type="checkbox" @bind="unknown" />Include unknown dates</label>
+    <button disabled="@busy" @onclick="FilterAsync">Apply filters</button>
+</fieldset>
+<div class="actions"><button disabled="@busy" @onclick="New">Create event</button><button disabled="@busy" @onclick="ReloadAsync">Refresh timeline</button></div>
+<details class="panel"><summary>Extract date candidates from a source</summary>
+    <label>Source<select aria-label="Event extraction source" @bind="sourceId"><option value="">Choose source</option>@foreach (var s in sources) { <option value="@s.Id">@s.Title</option> }</select></label>
+    <button disabled="@(busy || !sourceId.HasValue)" @onclick="GenerateAsync">Queue date extraction</button>
+    <a href="/processing-jobs">Monitor, cancel or retry jobs</a><p>After completion, choose Proposed and refresh. Date mentions suggest evidence; they do not establish that an event occurred.</p>
+</details>
+@if (events is null) { <p role="status">Loading timeline…</p> }
+else
+{
+    <p>@events.Total events · page @(page)</p>
+    @if (events.Total == 0) { <p class="panel">No events match these filters. Create an event or extract source date candidates.</p> }
+    <ol class="timeline" aria-label="Chronological events">
+    @foreach (var item in events.Items)
+    {
+        <li><span class="timeline-date">@TemporalDisplay.Date(item)</span><button class="timeline-title" disabled="@busy" @onclick="() => SelectAsync(item.Id)">@item.Title</button>
+            <span class="muted">@item.Type · @item.Status · @item.Evidence.Count citations</span></li>
+    }
+    </ol>
+    <div class="actions"><button disabled="@(busy || page <= 1)" @onclick="() => PageAsync(-1)">Previous events</button><button disabled="@(busy || page * 20 >= events.Total)" @onclick="() => PageAsync(1)">Next events</button></div>
+}
+@if (editing)
+{
+    <section class="panel" aria-label="Event inspector"><h2>@(selected is null ? "New event" : selected.Title)</h2>
+    @if (selected?.OriginalDateText is not null) { <p>Original date mention: <strong>@selected.OriginalDateText</strong></p><p>@selected.Interpretation</p> }
+    <EditForm Model="edit" OnValidSubmit="SaveAsync" FormName="event-editor"><DataAnnotationsValidator /><ValidationSummary />
+        <fieldset disabled="@busy" class="editor" @onchange="MarkDirty"><label>Title<InputText @bind-Value="edit.Title" /></label><label>Description<InputTextArea @bind-Value="edit.Description" /></label>
+        <label>Type<InputSelect aria-label="Type" @bind-Value="edit.Type">@foreach (var t in Enum.GetValues<EventType>()) { <option>@t</option> }</InputSelect></label>
+        <label>Date precision<InputSelect aria-label="Date precision" @bind-Value="edit.DatePrecision">@foreach (var p in Enum.GetValues<DatePrecision>()) { <option>@p</option> }</InputSelect></label>
+        <p class="muted">EXACT: yyyy-MM-dd; MONTH: yyyy-MM; YEAR: yyyy; UNKNOWN: leave dates empty. Optional end applies only to EXACT.</p>
+        <label>Date value<InputText @bind-Value="edit.DateValue" /></label><label>Optional end date<InputText @bind-Value="edit.EndDateValue" /></label>
+        <label>Approved location<InputSelect aria-label="Approved location" @bind-Value="edit.LocationId"><option value="">No location</option>@foreach (var l in locations.Where(x => x.Status == ReviewStatus.APPROVED)) { <option value="@l.Id">@l.Name (@l.Precision)</option> }</InputSelect></label>
+        <label>Find entities<input aria-label="Find event entities" @bind="entitySearch" /></label><button type="button" @onclick="SearchAsync">Find entities</button>
+        @foreach (var e in entityChoices)
+        { <label><input type="checkbox" checked="@edit.EntityIds.Contains(e.Id)" @onchange="args => ToggleEntity(e.Id, args.Value is true)" />@e.Name (@e.Type)</label> }
+        @if (edit.EntityIds.Count > 0) { <p>@edit.EntityIds.Count associated entities</p> }
+        <button type="submit">Save event proposal</button><button type="button" @onclick="() => editing = false">Close editor</button></fieldset>
+    </EditForm>
+    @if (selected is not null)
+    {
+        <p>Current review: @selected.Status</p>
+        @foreach (var entityId in selected.EntityIds) { <a class="button" href="@($"/entities/{entityId}")">Associated entity</a> }
+        @if (dirty) { <p role="status">Save or reload your draft edits before reviewing this event or changing its citations.</p> }
+        <fieldset class="review-citations" disabled="@dirty"><TemporalCitations @key="selected.Id" InvestigationId="Id" RecordId="selected.Id" Revision="selected.Revision" Evidence="selected.Evidence" Changed="RefreshSelectedAsync" /></fieldset>
+        <label><input type="checkbox" @bind="confirm" />I reviewed this event and its evidence; confirm the selected action.</label>
+        <div class="actions"><button disabled="@(busy || dirty || !confirm)" @onclick='() => ReviewAsync("approve")'>Approve event</button><button disabled="@(busy || dirty || !confirm)" @onclick='() => ReviewAsync("reject")'>Reject event</button><button class="danger" disabled="@(busy || dirty || !confirm)" @onclick='() => ReviewAsync("remove")'>Remove event</button></div>
+    }
+    </section>
+}
+@code {
+    [Parameter] public Guid Id { get; set; }
+    [SupplyParameterFromQuery] public Guid? EventId { get; set; }
+    private PageResult<EventResponse>? events;
+    private List<SourceSummary> sources = [];
+    private List<LocationResponse> locations = [];
+    private List<EntityResponse> entityChoices = [];
+    private EventResponse? selected;
+    private EventEditRequest edit = new();
+    private string status = "APPROVED", type = "", from = "", to = "", entitySearch = "";
+    private string? error, message;
+    private bool unknown = true, busy, editing, confirm, interactive, dirty;
+    private int page = 1;
+    private Guid? sourceId;
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    { if (firstRender) { interactive = true; StateHasChanged(); } return Task.CompletedTask; }
+    private void MarkDirty() { dirty = true; confirm = false; }
+    protected override async Task OnParametersSetAsync() => await RunAsync(async () =>
+    { sources = await Sources.ListAsync(Id); locations = await Client.LocationsAsync(Id); await LoadAsync(); if (EventId.HasValue) await SelectCoreAsync(EventId.Value); });
+    private async Task LoadAsync() => events = await Client.EventsAsync(Id, status, type, from, to, unknown, page);
+    private async Task ReloadAsync() => await RunAsync(LoadAsync);
+    private async Task FilterAsync() { page = 1; await ReloadAsync(); }
+    private async Task PageAsync(int delta) { page += delta; await ReloadAsync(); }
+    private void New() { selected = null; edit = new(); editing = true; confirm = false; dirty = false; entityChoices = []; }
+    private async Task SelectAsync(Guid id) => await RunAsync(() => SelectCoreAsync(id));
+    private async Task SelectCoreAsync(Guid id)
+    {
+        selected = await Client.EventAsync(id);
+        if (selected.InvestigationId != Id) { selected = null; throw new HttpRequestException("Event belongs to another investigation."); }
+        edit = new() { Title = selected.Title, Description = selected.Description, DatePrecision = selected.DatePrecision, DateValue = TemporalDisplay.DateValue(selected),
+            EndDateValue = selected.DatePrecision == DatePrecision.EXACT && selected.EndAt != selected.StartAt ? selected.EndAt?.ToString("yyyy-MM-dd") : null,
+            Type = selected.Type, EntityIds = [.. selected.EntityIds], LocationId = selected.LocationId, Revision = selected.Revision };
+        entityChoices = []; foreach (var entityId in selected.EntityIds) entityChoices.Add(await Intelligence.EntityAsync(entityId));
+        editing = true; confirm = false; dirty = false;
+    }
+    private async Task RefreshSelectedAsync() { if (selected is not null) { await SelectAsync(selected.Id); await ReloadAsync(); } }
+    private async Task SaveAsync() => await RunAsync(async () =>
+    { var saved = await Client.SaveEventAsync(Id, selected?.Id, edit); await SelectCoreAsync(saved.Id); await LoadAsync(); message = "Event saved as proposed. Review its citations before approval."; });
+    private async Task ReviewAsync(string action) => await RunAsync(async () =>
+    { await Client.ActionAsync(selected!.Id, false, action, new ReviewTemporalRequest(confirm, selected.Revision)); if (action == "remove") { selected = null; editing = false; } else await SelectCoreAsync(selected.Id); await LoadAsync(); message = $"Event action completed: {action}."; });
+    private async Task SearchAsync() => await RunAsync(async () =>
+    { var result = await Intelligence.EntitiesAsync(Id, entitySearch); entityChoices = entityChoices.Concat(result.Items).DistinctBy(x => x.Id).ToList(); message = $"Showing {result.Items.Count} search matches. Narrow the search if needed."; });
+    private void ToggleEntity(Guid id, bool value) { if (value) { if (!edit.EntityIds.Contains(id)) edit.EntityIds.Add(id); } else edit.EntityIds.Remove(id); }
+    private async Task GenerateAsync() => await RunAsync(async () => { var job = await Client.GenerateAsync(sourceId!.Value); message = $"Date extraction queued ({job.Id}). Monitor processing jobs, then refresh Proposed events."; });
+    private async Task RunAsync(Func<Task> action)
+    { busy = true; error = null; message = null; try { await action(); } catch (HttpRequestException ex) { error = ex.Message; } catch (TaskCanceledException) { error = "Request timed out. Refresh before retrying."; } finally { busy = false; } }
+}

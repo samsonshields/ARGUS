@@ -1,4 +1,4 @@
-# Architecture through Phase 4
+# Architecture through Phase 5
 
 The repository root is the proposed argus monorepo root. The supplied specification
 is project_specifications.md; the requested hyphenated filename is absent. There was
@@ -149,4 +149,40 @@ API/domain/real-Python tests cover proposed evidence, review, retries, merge ret
 exact snapshot provenance and graph invariants. The real-process Edge smoke builds its
 100-node/300-edge fixture through ordinary API imports/approvals, not direct Python DB
 writes, and verifies browser interaction/performance while blocking non-loopback assets.
-Phase 5 timeline, geographic/event processing and map functionality remain absent.
+Phase 5 was subsequently authorized and is described below.
+
+## Phase 5: timeline and geography
+
+Core defines AnalysisEvent, EventEvidence, EventEntity, LocationProfile, LocationEvidence
+and GeographicFocus, with validated DTOs, interval/date rules, explicit precision and
+optimistic revisions. TemporalSchema and the additive TimelineGeography migration keep
+foreign keys restricted and associations within their investigation. TemporalService
+coordinates review, snapshot citation selection, date generation, bounded map/timeline
+queries and atomic audit writes. Controllers remain transport adapters. There is no
+new database dependency in Web or any persistence dependency in Python.
+
+EVENTS jobs reuse the persistent worker and bounded typed HTTP transport. Python detects
+English/ISO date mentions and sentences without resolving relative dates or inferring a
+locale/year. The API independently validates hashes, UTF-16 spans, quoted text and date
+values. Stable snapshot/span/method keys preserve decisions and removals across reruns.
+Source extraction status is unaffected. Results/job/audits commit atomically after HTTP;
+cancellation/restart behavior is shared with the existing queue. Snapshots can be staged
+in the result transaction for events, rather than committed before their HTTP call.
+
+TemporalApiClient is the sole HTTP entry point for the new Blazor pages. Timeline and
+map use explicit saves/reviews, shared snapshot citation controls, safe Razor text and
+DOM textContent labels. Unsaved form drafts cannot be approved; save/reload first.
+Leaflet 1.9.4 renders offline coordinate grids, approved markers and uncertainty circles.
+The optional online OSM basemap is opt-in, uses normal browser caching/identification,
+keeps attribution visible and has no proxy or bulk download. Map clicks affect drafts;
+pan/zoom affects view state. Only explicit focus saving writes the viewport preference.
+Source/entity/timeline links retain investigation context. Details and keyboard selectors
+provide access alongside SVG markers. Enum names are explicitly serialized for JS.
+
+Entity merges redirect event links and location entity references; two active profiles
+require explicit retirement before merging. Corrected or citation-edited records need
+fresh approval. Soft removal retains citations, provenance and audit history. Unknown
+locations are retained for review but never represented as precise points. See
+[temporal contracts](temporal-contracts.md) for limits and wire semantics.
+
+Phase 6 assessments, claims and reports have not been started.

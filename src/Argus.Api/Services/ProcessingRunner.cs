@@ -12,7 +12,7 @@ using Microsoft.Extensions.Options;
 namespace Argus.Api.Services;
 
 public sealed class ProcessingRunner(ArgusDbContext db, SourceService sources, ProcessingJobService jobs,
-    IIntelligenceClient intelligence, IOptions<IntelligenceOptions> options, ILogger<ProcessingRunner> logger, RelationshipService relationships)
+    IIntelligenceClient intelligence, IOptions<IntelligenceOptions> options, ILogger<ProcessingRunner> logger, RelationshipService relationships, TemporalService temporal)
 {
     public async Task<bool> RunNextAsync(CancellationToken ct)
     {
@@ -26,6 +26,15 @@ public sealed class ProcessingRunner(ArgusDbContext db, SourceService sources, P
         catch (DbUpdateConcurrencyException) { return true; }
         try
         {
+            if (job.Kind == JobKind.EVENTS)
+            {
+                var count = await temporal.PrepareEventsAsync(source, job, ct);
+                var snapshotId = job.SnapshotId;
+                await db.Entry(job).ReloadAsync(ct);
+                if (job.State != JobState.RUNNING) return true;
+                job.AttachSnapshot(snapshotId!.Value); job.Complete(count); jobs.Audit(job, "EventsGenerated");
+                await db.SaveChangesAsync(ct); return true;
+            }
             if (job.Kind == JobKind.RELATIONSHIPS)
             {
                 var count = await relationships.PrepareForSourceAsync(source, ct);
