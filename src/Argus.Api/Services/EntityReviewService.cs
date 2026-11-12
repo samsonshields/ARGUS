@@ -17,7 +17,9 @@ public sealed class EntityReviewService(ArgusDbContext db, IOptions<Intelligence
         await db.EntityMentions.CountAsync(x => x.Status == ReviewStatus.PROPOSED, ct),
         await db.Entities.CountAsync(x => x.MergedIntoId == null, ct),
         await db.ProcessingJobs.CountAsync(x => x.State == JobState.PENDING || x.State == JobState.RUNNING, ct),
-        await db.ProcessingJobs.CountAsync(x => x.State == JobState.FAILED, ct));
+        await db.ProcessingJobs.CountAsync(x => x.State == JobState.FAILED, ct),
+        await db.Relationships.CountAsync(x => x.RetiredReason == null && x.Status == ReviewStatus.PROPOSED, ct),
+        await db.Relationships.CountAsync(x => x.RetiredReason == null && x.Status == ReviewStatus.APPROVED, ct));
 
     public async Task<PageResult<MentionResponse>> MentionsAsync(Guid investigationId, Guid? sourceId, Guid? entityId,
         ReviewStatus? status, int page, int pageSize, CancellationToken ct)
@@ -129,6 +131,13 @@ public sealed class EntityReviewService(ArgusDbContext db, IOptions<Intelligence
         catch (InvalidOperationException) { throw new SourceException(409, "Merge requires active entities of the same investigation and type. Correct classifications first if needed."); }
         var mentions = await db.EntityMentions.Where(x => x.EntityId == source.Id).ToListAsync(ct);
         foreach (var mention in mentions) mention.MoveTo(target);
+        var relationships = await db.Relationships.Where(x => x.SourceEntityId == source.Id || x.TargetEntityId == source.Id).ToListAsync(ct);
+        foreach (var relationship in relationships)
+        {
+            var prior = JsonSerializer.Serialize(relationship);
+            relationship.RedirectEntity(source.Id, target.Id);
+            Audit(source.InvestigationId, "Relationship", relationship.Id, "EndpointsMerged", relationship, prior);
+        }
         Audit(source.InvestigationId, "Entity", source.Id, "Merged", new { Source = source.ToResponse(0), Target = target.ToResponse(0) }, before);
         await db.SaveChangesAsync(ct);
         return await GetEntityAsync(target.Id, ct);

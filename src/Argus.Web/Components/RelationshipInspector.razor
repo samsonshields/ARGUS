@@ -1,0 +1,91 @@
+@inject GraphApiClient Client
+@if (error is not null) { <p role="alert" class="error">@error</p> }
+@if (detail is not null)
+{
+    var relation = detail.Relationship;
+    <section class="panel relationship-detail">
+        <h2>Relationship evidence</h2>
+        <p><strong>@relation.SourceName @(Relationship.Directed(relation.Type) ? "→" : "↔") @relation.TargetName</strong></p>
+        <p>@relation.Type / @relation.Status / @relation.ApprovedEvidenceCount reviewed passages / @relation.ProposedEvidenceCount pending passages</p>
+        <p class="muted">Origin: @relation.Origin. Co-occurrence is not proof of a substantive connection.</p>
+        @if (relation.RetiredReason is not null) { <p class="error">@relation.RetiredReason</p> }
+        @if (!string.IsNullOrEmpty(relation.Notes)) { <p>Analyst reasoning: @relation.Notes</p> }
+        @foreach (var evidence in detail.Evidence)
+        {
+            <article class="citation panel">
+                @if (evidence.Status == ReviewStatus.PROPOSED && relation.Status != ReviewStatus.REJECTED && relation.RetiredReason is null)
+                { <label><input type="checkbox" checked="@selected.Contains(evidence.Id)" @onchange="() => Toggle(evidence.Id)" /> Include this passage in review</label> }
+                <p><a href="@($"/sources/{evidence.SourceId}")">@evidence.SourceTitle</a> / @evidence.Status</p>
+                <blockquote>@evidence.Quote</blockquote>
+                <p class="muted">Snapshot offsets @evidence.Start–@evidence.End (UTF-16). @evidence.Method</p>
+            </article>
+        }
+        <div class="actions"><button disabled="@(busy || evidencePage == 1)" @onclick="() => PageAsync(-1)">Previous passages</button>
+            <span>Page @(evidencePage) / @detail.EvidenceTotal passages</span><button disabled="@(busy || evidencePage * detail.EvidencePageSize >= detail.EvidenceTotal)" @onclick="() => PageAsync(1)">Next passages</button></div>
+        @if (relation.Status != ReviewStatus.REJECTED && relation.RetiredReason is null)
+        {
+            <EditForm Model="review" OnValidSubmit="ApproveAsync" FormName="review-relationship" class="editor">
+                <DataAnnotationsValidator /><ValidationSummary />
+                <label for="relationship-kind">Reviewed relationship type</label>
+                <InputSelect id="relationship-kind" @bind-Value="review.Type" disabled="@(relation.Status == ReviewStatus.APPROVED)">
+                    @foreach (var type in Enum.GetValues<RelationshipType>()) { <option value="@type">@type</option> }
+                </InputSelect>
+                @if (review.Type == RelationshipType.CUSTOM) { <label for="custom-relation">Custom label</label><InputText id="custom-relation" @bind-Value="review.CustomLabel" maxlength="100" disabled="@(relation.Status == ReviewStatus.APPROVED)" /> }
+                @if (relation.Status == ReviewStatus.PROPOSED && Relationship.Directed(review.Type))
+                { <label><InputCheckbox @bind-Value="review.Reverse" /> Reverse direction (target → source)</label> }
+                <label for="relationship-notes">Analyst reasoning (required for substantive relationships)</label><InputTextArea id="relationship-notes" @bind-Value="review.Notes" maxlength="2000" />
+                <label><InputCheckbox @bind-Value="review.ConfirmEvidenceReviewed" /> I reviewed the selected passages; co-mention alone does not substantiate another relationship type.</label>
+                <div class="actions"><button disabled="@(busy || selected.Count == 0)" type="submit">Approve selected evidence</button>
+                    @if (relation.Status == ReviewStatus.PROPOSED) { <button disabled="@busy" type="button" @onclick="RejectAsync">Reject proposal</button> }
+                </div>
+            </EditForm>
+        }
+        @if (success is not null) { <p role="status" class="success">@success</p> }
+    </section>
+}
+else if (Id.HasValue) { <p role="status">Loading relationship evidence...</p> }
+@code {
+    [Parameter] public Guid? Id { get; set; }
+    [Parameter] public EventCallback Reviewed { get; set; }
+    private Guid? loaded;
+    private RelationshipDetail? detail;
+    private RelationshipReviewRequest review = new();
+    private HashSet<Guid> selected = [];
+    private int evidencePage = 1;
+    private bool busy;
+    private string? error, success;
+    protected override async Task OnParametersSetAsync()
+    {
+        if (loaded == Id) return;
+        loaded = Id; detail = null; evidencePage = 1; selected.Clear(); error = success = null;
+        if (Id.HasValue) await LoadAsync();
+    }
+    private async Task LoadAsync()
+    {
+        try
+        {
+            detail = await Client.DetailAsync(Id!.Value, evidencePage);
+            review = new() { Type = detail.Relationship.Type, Notes = detail.Relationship.Notes, CustomLabel = detail.Relationship.CustomLabel };
+        }
+        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (TaskCanceledException) { error = "Evidence loading timed out."; }
+    }
+    private void Toggle(Guid id) { if (!selected.Add(id)) selected.Remove(id); review.EvidenceIds = selected.ToList(); }
+    private async Task PageAsync(int delta) { evidencePage += delta; selected.Clear(); await LoadAsync(); }
+    private async Task ApproveAsync()
+    {
+        busy = true; error = null;
+        try { review.EvidenceIds = selected.ToList(); detail = await Client.ApproveAsync(Id!.Value, review); evidencePage = 1; selected.Clear(); success = "Relationship evidence approved. Co-mention remains a low-assertion connection."; await LoadAsync(); await Reviewed.InvokeAsync(); }
+        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (TaskCanceledException) { error = "Review timed out. Refresh before retrying."; }
+        finally { busy = false; }
+    }
+    private async Task RejectAsync()
+    {
+        busy = true; error = null;
+        try { await Client.RejectAsync(Id!.Value); success = "Proposal rejected; its source history is retained."; selected.Clear(); await LoadAsync(); await Reviewed.InvokeAsync(); }
+        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (TaskCanceledException) { error = "Rejection timed out. Refresh before retrying."; }
+        finally { busy = false; }
+    }
+}

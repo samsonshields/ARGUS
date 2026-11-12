@@ -1,9 +1,10 @@
 # ARGUS
 
-Local-first OSINT analysis workstation for Windows. Phases 1–3 provide investigations,
+Local-first OSINT analysis workstation for Windows. Phases 1–4 provide investigations,
 preserved source documents, asynchronous local entity recognition and analyst review.
 Approve/correct/reject mentions, inspect exact source evidence, associate mentions
-with existing entities and explicitly merge duplicate records. **Phase 4 has not begun.**
+with existing entities and explicitly merge duplicate records. Explore evidence-linked
+relationship graphs and review sentence co-mentions. **Phase 5 has not begun.**
 
 ## Requirements
 
@@ -77,6 +78,7 @@ dotnet test Argus.sln --no-restore
 dotnet format Argus.sln --no-restore --verify-no-changes
 python scripts/smoke.py
 python scripts/smoke_nlp.py
+intelligence-service/.venv/Scripts/python.exe scripts/smoke_graph.py
 intelligence-service/.venv/Scripts/python.exe -m pytest intelligence-service/tests -q -c intelligence-service/pyproject.toml
 intelligence-service/.venv/Scripts/python.exe -m ruff check intelligence-service/app intelligence-service/tests
 intelligence-service/.venv/Scripts/python.exe -m ruff format --check intelligence-service/app intelligence-service/tests
@@ -91,6 +93,12 @@ The compatibility smoke explicitly disables automatic NLP and the worker to test
 Phase 1/2 APIs in isolation. `smoke_nlp.py` launches all three real processes with
 automatic processing enabled, tests entity review, service outage/retry and queued
 work across restarts. It requires the installed venv/model and writes `.local/smoke-nlp.log`.
+The graph smoke uses the real NLP/API workflow to create 100 explicitly reviewed
+fictional identities and 300 edges, then drives headless Microsoft Edge using Playwright.
+It tests graph controls, citations/review, offline assets and restart persistence.
+It requires Edge (or set `ARGUS_BROWSER_CHANNEL=chrome` for installed Chrome), the
+development Python requirements and a build. No browser download is required with Edge.
+Artifacts are ignored under `.local/smoke-graph.log` and `.local/phase4-graph*.png`.
 
 Manual UI check: create an investigation, edit its scope/status, filter by Archived,
 cancel a deletion, restart both apps, reopen the record, and confirm deletion.
@@ -161,7 +169,8 @@ selected suggested entity. Name similarity is not proof of identity.
 The approved entity page supports corrections, aliases retained from renames and
 confirmed merges. Merging moves approved mentions but keeps their original text,
 model labels and snapshot references. Records from different investigations cannot merge.
-There are no relationships, graphs or graph algorithms in this release.
+Entity merges preserve relationship citations too. Self-links caused by a merge leave
+the active graph but remain accessible in relationship history.
 
 Jobs persist as PENDING/RUNNING/COMPLETED/FAILED/CANCELLED. Interrupted RUNNING jobs
 recover on API startup, retaining their attempt budget. Transient errors retry at most
@@ -189,6 +198,48 @@ wait for completion; inspect a highlighted mention; approve one and reject anoth
 associate a second mention explicitly; correct/merge duplicate entities; stop Python
 and observe bounded failures; restart/retry; restart API and verify reviews/evidence persist.
 
+## Relationship review and graph
+
+After approving entity mentions, open **Relationship review** in the investigation and
+select **Generate co-mention candidates**. Each eligible source queues a RELATIONSHIPS
+job. Refresh the review list after it completes; automatic generation never approves edges.
+Python uses deterministic sentence boundaries over exact snapshots, with at most one
+candidate per distinct entity pair per sentence. Different sentences are not connected.
+
+Select a relationship to inspect its exact quoted passage and document link. Check
+the passages you reviewed and explicitly confirm review. Keeping MENTIONED_WITH
+records only that the entities occurred in the sentence. A substantive type requires
+analyst reasoning; directed types also offer a reverse-direction control. Rejected
+proposals and their citations remain in history. New passages attached to an already
+reviewed co-mention remain proposed until individually reviewed.
+
+Open **Relationship graph** for pan/zoom, filters, node lookup/selection, unique-neighbor
+and incident-edge counts, component membership, degree centrality and betweenness.
+Select an edge for its type, status and cited passages. The HTML selectors provide
+keyboard access alongside the canvas. **Focus selected node** narrows the current view;
+**Expand neighbors** reveals its cached neighbors; **Show full graph** restores the view.
+Shortest paths can optionally respect directed edges. Paths use the applied filters.
+Graph interactions do not modify underlying evidence.
+
+Visual key: dashed amber = proposed; dotted gray = reviewed co-mention; solid cyan =
+analyst-reviewed substantive relationship. Co-occurrence is never proof of a substantive
+relationship. Metrics describe a simple undirected graph projection, not the intent,
+importance or threat level of a person. Parallel reviewed edges remain distinct, while
+centralities count unique neighbors. Rejected/retired edges are excluded from the graph.
+
+Cytoscape.js 3.33.4 is vendored locally with its MIT license and verified package
+integrity; runtime graph rendering uses no CDN. Layouts use COSE for up to 300 nodes
+and a grid beyond that. Graph responses are bounded to 2,000 nodes / 10,000 edges;
+apply filters when larger. Relationship/evidence collections are paginated.
+Co-mention jobs are bounded to 50 snapshots and 5,000 candidate passages per job,
+5,000 input mentions per snapshot, 8,000 UTF-16 units per citation and a 120-second
+total generation deadline. Existing NLP HTTP/input/response/retry limits still apply.
+
+Manual Phase 4 check: approve two entities in one source sentence, generate proposals,
+inspect/review a citation, compare proposed versus reviewed edge styles, filter, select
+a node, expand neighbors, highlight a path, restart and reopen the evidence. No timeline,
+geographic/event processing, maps or Phase 5 endpoints are implemented.
+
 ## Structure
 
 - `Argus.sln`: Web, API, Core, Infrastructure, unit and integration test projects.
@@ -205,10 +256,11 @@ vulnerable native dependency pulled by EF's default bundle. Native Blazor forms 
 custom CSS keep the shell small; MudBlazor compatibility was checked but it is not installed.
 
 Microsoft.OpenApi is pinned to patched 2.7.5 rather than the vulnerable transitive 2.0.0.
-Browser clicks/file-selection/visual review remain manual verification. English NER is
+The graph workflow has automated Edge browser coverage and screenshots. Broader
+file-selection/entity-review UI workflows retain their manual checklists. English NER is
 model-dependent and may miss or misclassify entities. Python test tooling currently
-emits one upstream httpx deprecation warning; tests still pass. Graphs, relationships,
-timelines, maps and assessments remain deferred.
+emits one upstream httpx deprecation warning; tests still pass. Timelines, maps and
+assessments remain deferred.
 
 See [specification](docs/project_specifications.md), [architecture](docs/architecture.md),
 [API contracts](docs/api-contracts.md), [schema](docs/database-schema.md) and

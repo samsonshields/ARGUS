@@ -12,7 +12,7 @@ using Microsoft.Extensions.Options;
 namespace Argus.Api.Services;
 
 public sealed class ProcessingRunner(ArgusDbContext db, SourceService sources, ProcessingJobService jobs,
-    IIntelligenceClient intelligence, IOptions<IntelligenceOptions> options, ILogger<ProcessingRunner> logger)
+    IIntelligenceClient intelligence, IOptions<IntelligenceOptions> options, ILogger<ProcessingRunner> logger, RelationshipService relationships)
 {
     public async Task<bool> RunNextAsync(CancellationToken ct)
     {
@@ -21,11 +21,19 @@ public sealed class ProcessingRunner(ArgusDbContext db, SourceService sources, P
             .OrderBy(x => x.CreatedAt).ThenBy(x => x.Id).FirstOrDefaultAsync(ct);
         if (job is null) return false;
         var source = await db.Sources.SingleAsync(x => x.Id == job.SourceId, ct);
-        job.Start(); source.StartProcessing();
+        job.Start(); if (job.Kind == JobKind.ENTITIES) source.StartProcessing();
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateConcurrencyException) { return true; }
         try
         {
+            if (job.Kind == JobKind.RELATIONSHIPS)
+            {
+                var count = await relationships.PrepareForSourceAsync(source, ct);
+                await db.Entry(job).ReloadAsync(ct);
+                if (job.State != JobState.RUNNING) return true;
+                job.Complete(count); jobs.Audit(job, "RelationshipsGenerated"); await db.SaveChangesAsync(ct);
+                return true;
+            }
             await sources.ExtractForJobAsync(source, ct);
             await db.Entry(job).ReloadAsync(ct);
             if (job.State != JobState.RUNNING) return true;
@@ -60,6 +68,13 @@ public sealed class ProcessingRunner(ArgusDbContext db, SourceService sources, P
         {
             // Cancellation/review won the race. EF rolls back this SaveChanges transaction.
             db.ChangeTracker.Clear();
+            job = await db.ProcessingJobs.SingleAsync(x => x.Id == job.Id, ct);
+            if (job.State == JobState.RUNNING)
+            {
+                job.Fail("concurrent_update", "Reviewed entity records changed during processing; retry is bounded.", true,
+                    options.Value.MaxAttempts, options.Value.RetryDelaySeconds);
+                jobs.Audit(job, "ConcurrentRetry"); await db.SaveChangesAsync(ct);
+            }
         }
         catch (Exception ex)
         {
@@ -69,7 +84,7 @@ public sealed class ProcessingRunner(ArgusDbContext db, SourceService sources, P
             var failure = ex as ProcessingException ?? new("processing_failed", "Local processing failed; original documents and reviewed findings are preserved.", true);
             job.Fail(failure.Code, failure.Message, failure.Retryable, options.Value.MaxAttempts, options.Value.RetryDelaySeconds);
             // An extraction failure happened before the snapshot save; preserve its visible source status too.
-            if (failure.Code == "text_extraction_failed" || job.State == JobState.FAILED)
+            if (job.Kind == JobKind.ENTITIES && (failure.Code == "text_extraction_failed" || job.State == JobState.FAILED))
             {
                 var failedSource = await db.Sources.SingleAsync(x => x.Id == job.SourceId, ct);
                 if (failure.Code == "text_extraction_failed" || failedSource.ProcessingStatus is SourceProcessingStatus.Pending or SourceProcessingStatus.Processing)

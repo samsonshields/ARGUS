@@ -9,7 +9,7 @@ using Microsoft.Extensions.Options;
 
 namespace Argus.Infrastructure.ExternalServices;
 
-public sealed class IntelligenceClient(HttpClient http, IOptions<IntelligenceOptions> options) : IIntelligenceClient
+public sealed class IntelligenceClient(HttpClient http, IOptions<IntelligenceOptions> options) : IIntelligenceClient, IRelationshipClient
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     { Converters = { new JsonStringEnumConverter(allowIntegerValues: false) } };
@@ -22,13 +22,30 @@ public sealed class IntelligenceClient(HttpClient http, IOptions<IntelligenceOpt
 
     public async Task<NlpResponse> ProcessAsync(NlpRequest request, CancellationToken ct)
     {
-        if (request.Text.Length > options.Value.MaxTextCharacters)
-            throw new ProcessingException("text_limit", "Source text exceeds the configured NLP limit; no truncation was performed.");
+        CheckText(request.Text);
+        var response = await SendAsync<NlpResponse>("process/entities", request, ct);
+        EntityText.Validate(request, response, options.Value.MaxCandidates);
+        return response;
+    }
+    public async Task<RelationshipProcessingResponse> ProcessAsync(RelationshipProcessingRequest request, CancellationToken ct)
+    {
+        CheckText(request.Text);
+        var response = await SendAsync<RelationshipProcessingResponse>("process/relationships", request, ct);
+        RelationshipContract.Validate(request, response);
+        return response;
+    }
+    private void CheckText(string text)
+    {
+        if (text.Length > options.Value.MaxTextCharacters)
+            throw new ProcessingException("text_limit", "Source text exceeds the configured local pipeline limit; no truncation was performed.");
+    }
+    private async Task<T> SendAsync<T>(string path, object request, CancellationToken ct)
+    {
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
         deadline.CancelAfter(TimeSpan.FromSeconds(options.Value.TimeoutSeconds));
         try
         {
-            using var message = new HttpRequestMessage(HttpMethod.Post, "process/entities") { Content = JsonContent.Create(request, options: Json) };
+            using var message = new HttpRequestMessage(HttpMethod.Post, path) { Content = JsonContent.Create(request, options: Json) };
             using var response = await http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
             if (!response.IsSuccessStatusCode)
                 throw new ProcessingException(response.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable ? "nlp_not_ready" : "nlp_error",
@@ -41,9 +58,8 @@ public sealed class IntelligenceClient(HttpClient http, IOptions<IntelligenceOpt
                 if (buffer.Length + read > 4 * 1024 * 1024) throw new ProcessingException("response_limit", "NLP response exceeded its size limit.");
                 buffer.Write(chunk, 0, read);
             }
-            var result = JsonSerializer.Deserialize<NlpResponse>(buffer.ToArray(), Json)
+            var result = JsonSerializer.Deserialize<T>(buffer.ToArray(), Json)
                 ?? throw new ProcessingException("invalid_contract", "NLP service returned an empty response.");
-            EntityText.Validate(request, result, options.Value.MaxCandidates);
             return result;
         }
         catch (JsonException) { throw new ProcessingException("invalid_contract", "NLP service returned an invalid JSON contract."); }

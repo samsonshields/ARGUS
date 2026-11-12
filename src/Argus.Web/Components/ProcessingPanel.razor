@@ -1,8 +1,8 @@
 @implements IAsyncDisposable
 @inject IntelligenceApiClient Client
 <section class="panel">
-    <h2>Entity processing</h2>
-    <p class="muted">Local text extraction and spaCy recognition. All generated mentions require analyst review.</p>
+    <h2>Local processing</h2>
+    <p class="muted">Local text/entity or relationship jobs. All generated findings require analyst review.</p>
     @if (error is not null) { <p role="alert" class="error">@error</p> }
     @if (readiness is not null) { <p role="status">@readiness</p> }
     <div class="actions">
@@ -18,7 +18,7 @@
         {
             <div class="job-row">
                 <a href="@($"/sources/{job.SourceId}")">Source</a>
-                <strong>@job.State</strong> <span>Attempt @job.Attempts / @job.CreatedAt.ToString("u") / @job.CandidateCount candidates</span>
+                <strong>@job.Kind / @job.State</strong> <span>Attempt @job.Attempts / @job.CreatedAt.ToString("u") / @job.CandidateCount candidates</span>
                 @if (job.Error is not null) { <p class="error">@job.ErrorCode: @job.Error</p> }
                 @if (job.State is JobState.PENDING or JobState.RUNNING) { <button disabled="@busy" @onclick="() => ActAsync(job.Id, false)">Cancel job</button> }
                 @if (job.State is JobState.FAILED or JobState.CANCELLED) { <button disabled="@busy" @onclick="() => ActAsync(job.Id, true)">Retry job</button> }

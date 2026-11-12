@@ -12,20 +12,20 @@ namespace Argus.Api.Services;
 
 public sealed class ProcessingJobService(ArgusDbContext db, IOptions<IntelligenceOptions> options)
 {
-    public ProcessingJob AddForImport(Source source)
+    public ProcessingJob AddForImport(Source source, JobKind kind = JobKind.ENTITIES)
     {
-        source.QueueProcessing();
-        var job = new ProcessingJob(source);
+        if (kind == JobKind.ENTITIES) source.QueueProcessing();
+        var job = new ProcessingJob(source, kind);
         db.ProcessingJobs.Add(job);
         Audit(job, "Queued");
         return job;
     }
 
-    public async Task<JobResponse> QueueAsync(Guid sourceId, CancellationToken ct)
+    public async Task<JobResponse> QueueAsync(Guid sourceId, CancellationToken ct, JobKind kind = JobKind.ENTITIES)
     {
         var source = await db.Sources.FindAsync([sourceId], ct) ?? throw new SourceException(404, "Source not found.");
         if (await HasActiveAsync(sourceId, ct)) throw new SourceException(409, "This source already has an active processing job.");
-        var job = AddForImport(source);
+        var job = AddForImport(source, kind);
         try { await db.SaveChangesAsync(ct); }
         catch (DbUpdateException ex) when (ex.InnerException is Microsoft.Data.Sqlite.SqliteException { SqliteErrorCode: 19 })
         { throw new SourceException(409, "A processing job was queued concurrently. Reload the source."); }
@@ -49,7 +49,7 @@ public sealed class ProcessingJobService(ArgusDbContext db, IOptions<Intelligenc
         if (job.State is not (JobState.PENDING or JobState.RUNNING)) throw new SourceException(409, "Only active jobs can be cancelled.");
         job.Cancel();
         var source = await db.Sources.FindAsync([job.SourceId], ct);
-        source!.CancelProcessing();
+        if (job.Kind == JobKind.ENTITIES) source!.CancelProcessing();
         Audit(job, "Cancelled");
         await db.SaveChangesAsync(ct);
         return job.ToResponse();
@@ -58,7 +58,7 @@ public sealed class ProcessingJobService(ArgusDbContext db, IOptions<Intelligenc
     {
         var job = await FindAsync(id, ct);
         if (job.State is not (JobState.FAILED or JobState.CANCELLED)) throw new SourceException(409, "Only failed or cancelled jobs can be retried.");
-        return await QueueAsync(job.SourceId, ct);
+        return await QueueAsync(job.SourceId, ct, job.Kind);
     }
     public async Task RecoverAsync(CancellationToken ct)
     {
@@ -67,7 +67,7 @@ public sealed class ProcessingJobService(ArgusDbContext db, IOptions<Intelligenc
         {
             job.Recover(options.Value.MaxAttempts);
             Audit(job, "RecoveredAfterInterruption");
-            if (job.State == JobState.FAILED)
+            if (job.State == JobState.FAILED && job.Kind == JobKind.ENTITIES)
             {
                 var source = await db.Sources.FindAsync([job.SourceId], ct);
                 source!.CancelProcessing();

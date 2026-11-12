@@ -11,7 +11,7 @@ public sealed record NlpResponse(string ContractVersion, Guid SourceId, string T
     string OffsetConvention, NlpModel Model, List<NlpCandidate> Entities);
 public sealed record JobResponse(Guid Id, Guid SourceId, Guid InvestigationId, JobState State,
     int Attempts, string? ErrorCode, string? Error, DateTime CreatedAt, DateTime UpdatedAt,
-    DateTime? NextAttemptAt, Guid? SnapshotId, int CandidateCount);
+    DateTime? NextAttemptAt, Guid? SnapshotId, int CandidateCount, JobKind Kind = JobKind.ENTITIES);
 public sealed record MentionResponse(Guid Id, Guid SourceId, string SourceTitle, Guid SnapshotId,
     string Text, EntityType OriginalType, int Start, int End, ReviewStatus Status, Guid? EntityId,
     string ModelName, string ModelVersion, double? Confidence = null);
@@ -19,7 +19,8 @@ public sealed record MentionEvidence(MentionResponse Mention, string Before, str
 public sealed record EntityResponse(Guid Id, Guid InvestigationId, string Name, EntityType Type,
     IReadOnlyList<string> Aliases, int MentionCount, Guid? MergedIntoId);
 public sealed record EntitySuggestion(EntityResponse Entity, double Similarity);
-public sealed record IntelligenceStatistics(int Proposed, int ApprovedEntities, int PendingJobs, int FailedJobs);
+public sealed record IntelligenceStatistics(int Proposed, int ApprovedEntities, int PendingJobs, int FailedJobs,
+    int ProposedRelationships = 0, int ApprovedRelationships = 0);
 
 public class EntityEditRequest
 {

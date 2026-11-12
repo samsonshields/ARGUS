@@ -13,7 +13,9 @@ from spacy.language import Language
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.models.entities import EntityRequest, EntityResponse, ModelInfo
+from app.models.relationships import RelationshipRequest, RelationshipResponse
 from app.pipelines.entities import ExtractionLimitError, extract_entities, load_pipeline
+from app.pipelines.relationships import extract_relationships
 
 logger = logging.getLogger("argus.intelligence")
 MAX_BODY = 12_100_000
@@ -81,6 +83,9 @@ def create_app(model_name: str | None = None) -> FastAPI:
     if not 1 <= max_characters <= 2_000_000:
         raise ValueError("ARGUS_NLP_MAX_UTF16 must be between 1 and 2000000.")
     gate = Lock()
+    sentence_pipeline = spacy.blank("en")
+    sentence_pipeline.add_pipe("sentencizer")
+    sentence_pipeline.max_length = 2_000_000
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
@@ -151,6 +156,30 @@ def create_app(model_name: str | None = None) -> FastAPI:
         except Exception:
             logger.error("Entity pipeline failed; submitted text and parser diagnostics omitted.")
             return problem(500, "pipeline_failed", "The local entity pipeline failed.")
+        finally:
+            gate.release()
+
+    @application.post("/process/relationships", response_model=RelationshipResponse)
+    def relationships(payload: RelationshipRequest) -> RelationshipResponse | JSONResponse:
+        if len(payload.text.encode("utf-16-le")) // 2 > max_characters:
+            return problem(422, "text_limit", "Text exceeds the configured relationship limit.")
+        if not gate.acquire(blocking=False):
+            return problem(
+                503, "service_busy", "The local pipeline is processing another document."
+            )
+        try:
+            return RelationshipResponse(
+                sourceId=payload.sourceId,
+                textHash=payload.textHash,
+                relationships=extract_relationships(sentence_pipeline, payload),
+            )
+        except ExtractionLimitError:
+            return problem(
+                422, "candidate_limit", "Co-mention candidate or passage limit exceeded."
+            )
+        except Exception:
+            logger.error("Co-mention generation failed; document and parser diagnostics omitted.")
+            return problem(500, "pipeline_failed", "Local co-mention generation failed.")
         finally:
             gate.release()
 
