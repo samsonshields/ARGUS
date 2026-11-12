@@ -234,7 +234,7 @@ public sealed class AssessmentApiTests : IDisposable
         using var api = Factory(); using var client = api.CreateClient();
         Assert.Single((await client.GetFromJsonAsync<PageResult<EventResponse>>($"/api/v1/investigations/{inv.Id}/events?status=PROPOSED", Json))!.Items);
         Assert.Empty((await client.GetFromJsonAsync<PageResult<ClaimSummary>>($"/api/v1/investigations/{inv.Id}/claims", Json))!.Items);
-        var openApi = await client.GetStringAsync("/openapi/v1.json"); Assert.Contains("/api/v1/reports/{id}/markdown", openApi); Assert.Contains("/api/v1/claims/{id}/approve", openApi); Assert.DoesNotContain("/backups", openApi);
+        var openApi = await client.GetStringAsync("/openapi/v1.json"); Assert.Contains("/api/v1/reports/{id}/markdown", openApi); Assert.Contains("/api/v1/claims/{id}/approve", openApi); Assert.DoesNotContain("/collaboration", openApi);
     }
     public void Dispose() { Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools(); if (Directory.Exists(directory)) Directory.Delete(directory, true); }
 }

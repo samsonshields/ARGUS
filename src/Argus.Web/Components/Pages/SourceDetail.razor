@@ -2,7 +2,7 @@
 @rendermode InteractiveServer
 @inject SourceClient Sources
 <PageTitle>ARGUS | Source viewer</PageTitle>
-@if (error is not null) { <p class="error" role="alert">@error</p> }
+@if (error is not null) { <ErrorNotice Message="@error" /> }
 @if (loading) { <p role="status">Loading source...</p> }
 else if (item is not null)
 {
@@ -48,14 +48,14 @@ else if (item is not null)
     private async Task ProcessingChangedAsync()
     {
         try { item = await Sources.GetAsync(Id); if (review is not null) await review.ReloadAsync(); }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { error = "Source refresh timed out."; }
     }
     protected override async Task OnParametersSetAsync()
     {
         loading = true; item = null; error = null; review = null;
         try { SetItem(await Sources.GetAsync(Id)); }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { error = "Source loading timed out. Reload to retry."; }
         finally { loading = false; }
     }
@@ -69,7 +69,7 @@ else if (item is not null)
     {
         busy = true; error = success = null;
         try { SetItem(await Sources.UpdateAsync(Id, metadata)); success = "Source metadata saved."; }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { error = "Save timed out. Reload to check before retrying."; }
         finally { busy = false; }
     }
@@ -82,7 +82,7 @@ else if (item is not null)
             item = await Sources.ExtractAsync(Id);
             if (item.Source.ProcessingStatus == SourceProcessingStatus.Ready) success = "Text extraction completed.";
         }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { error = "Extraction timed out. Reload to check its status."; }
         finally { busy = false; }
     }

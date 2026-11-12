@@ -3,8 +3,9 @@
 @inject InvestigationClient Client
 @inject NavigationManager Navigation
 <PageTitle>ARGUS | Investigation overview</PageTitle>
+<InvestigationNav Id="Id" />
 <a href="/investigations">All investigations</a>
-@if (error is not null) { <p role="alert" class="error">@error</p> }
+@if (error is not null) { <ErrorNotice Message="@error" /> }
 @if (loading) { <p role="status">Loading investigation...</p> }
 else if (item is not null)
 {
@@ -18,6 +19,7 @@ else if (item is not null)
             <dt>Created (UTC)</dt><dd>@item.CreatedAt.ToString("u")</dd>
             <dt>Updated (UTC)</dt><dd>@item.UpdatedAt.ToString("u")</dd>
         </dl>
+        <div class="actions">
         <a class="button" href="@($"/investigations/{Id}/edit")">Edit details / archive</a>
         <a class="button" href="@($"/investigations/{Id}/sources")">Source library</a>
         <a class="button" href="@($"/investigations/{Id}/entities")">Entities and review</a>
@@ -27,6 +29,7 @@ else if (item is not null)
         <a class="button" href="@($"/investigations/{Id}/map")">Geography and locations</a>
         <a class="button" href="@($"/investigations/{Id}/assessments")">Assessments and claims</a>
         <a class="button" href="@($"/investigations/{Id}/reports")">Markdown reports</a>
+        </div>
     </div>
     <section class="panel danger-zone"><h2>Delete investigation</h2>
     <p class="muted">Investigations with preserved sources cannot be deleted. Archive them to retain their evidence.</p>
@@ -57,7 +60,7 @@ else if (item is not null)
     {
         deleting = true;
         try { await Client.DeleteAsync(Id); Navigation.NavigateTo("/investigations"); }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { error = "Deletion timed out. Check the list before retrying."; }
         finally { deleting = false; }
     }

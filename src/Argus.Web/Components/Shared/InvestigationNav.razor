@@ -1,0 +1,9 @@
+<nav class="investigation-nav" aria-label="Investigation sections">
+    @foreach (var section in sections)
+    { <NavLink href="@($"/investigations/{Id}{section.Path}")" Match="NavLinkMatch.All">@(section.Label)</NavLink> }
+</nav>
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private static readonly (string Path, string Label)[] sections = [("", "Overview"), ("/sources", "Sources"), ("/entities", "Entities"),
+        ("/relationships", "Relationships"), ("/graph", "Graph"), ("/timeline", "Timeline"), ("/map", "Geography"), ("/assessments", "Assessments"), ("/reports", "Reports")];
+}

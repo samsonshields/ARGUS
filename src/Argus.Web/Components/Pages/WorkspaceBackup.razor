@@ -1,0 +1,37 @@
+@page "/workspace-backup"
+@rendermode InteractiveServer
+@inject IJSRuntime JS
+<PageTitle>ARGUS | Workspace backup</PageTitle>
+<a href="/">Dashboard</a><h1>Workspace backup</h1>
+<p class="description">Export all investigations, original documents, preserved evidence, review history and saved reports in one archive.</p>
+<section class="panel"><h2>Download a recoverable copy</h2>
+    <p>The application can stay open while the backup is prepared. The archive contains a consistent database snapshot, verified originals and a checksum manifest.</p>
+    <p>It includes the full local workspace. Keep the downloaded file in a location appropriate for your research material.</p>
+    <label><input type="checkbox" @bind="confirmed" />I want to download the complete workspace.</label>
+    <button disabled="@(!interactive || !confirmed || busy)" @onclick="DownloadAsync">@(busy ? "Preparing backup…" : "Download workspace backup")</button>
+    @if (error is not null) { <ErrorNotice Message="@error" /> }
+    @if (message is not null) { <p role="status" class="success">@message</p> }
+    <p class="muted">Preparation may take up to two minutes. Export limits are 5000 originals and 512 MiB uncompressed. A failed integrity check blocks the download.</p>
+</section>
+<section class="panel"><h2>Restore into a new workspace</h2>
+    <p>Use the API executable's restore command while choosing a new data directory. Existing directories are never replaced. The archive and every file are validated before the new workspace is installed.</p>
+    <pre class="passage">dotnet run --project src/Argus.Api --no-build -- --restore-backup "backup.zip" "C:/Argus/restored-data"</pre>
+    <p>Then start the API with <code>ARGUS_DATA_DIRECTORY</code> set to the restored directory. Use the README setup guide for the complete commands.</p>
+    <p class="muted">Archives contain research data, not application binaries, installed models or environment secrets. Restore an archive only if you trust its origin; checksums detect corruption, not authorship.</p>
+</section>
+@code {
+    private bool confirmed, busy, interactive;
+    private string? error, message;
+    protected override Task OnAfterRenderAsync(bool firstRender) { if (firstRender) { interactive = true; StateHasChanged(); } return Task.CompletedTask; }
+    private async Task DownloadAsync()
+    {
+        busy = true; error = null; message = null;
+        try
+        {
+            await JS.InvokeVoidAsync("argusBackupDownload");
+            message = "Backup downloaded. Keep it with your recovery records."; confirmed = false;
+        }
+        catch (JSException) { error = "Backup failed. Check that the API is running, original files are available and sufficient space remains. No incomplete archive is downloaded."; }
+        finally { busy = false; }
+    }
+}

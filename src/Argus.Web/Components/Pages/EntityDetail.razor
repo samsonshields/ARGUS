@@ -3,9 +3,9 @@
 @inject IntelligenceApiClient Client
 @inject NavigationManager Navigation
 <PageTitle>ARGUS | Entity evidence</PageTitle>
-@if (error is not null) { <p role="alert" class="error">@error</p> }
-@if (entity is null) { <p>Entity loading, or unavailable.</p> }
-else
+@if (error is not null) { <ErrorNotice Message="@error" /> }
+@if (entity is null && error is null) { <p role="status">Loading entity?</p> }
+else if (entity is not null)
 {
     <a href="@($"/investigations/{entity.InvestigationId}/entities")">Investigation entities and review</a>
     <a href="@($"/investigations/{entity.InvestigationId}/graph")">Investigation graph</a>
@@ -98,7 +98,7 @@ else
     {
         busy = true; error = null;
         try { await action(); }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { error = "The request timed out. Reload before retrying."; }
         finally { busy = false; }
     }

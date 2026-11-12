@@ -38,7 +38,7 @@
     private bool busy;
     private string? error;
     protected override async Task OnInitializedAsync()
-    { try { sources = await Sources.ListAsync(InvestigationId); } catch (HttpRequestException ex) { error = ex.Message; } }
+    { try { sources = await Sources.ListAsync(InvestigationId); } catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); } }
     private async Task LoadAsync() { page = 1; await FetchAsync(); }
     private async Task ChangePageAsync(int delta) { page += delta; await FetchAsync(); }
     private async Task FetchAsync() => await RunAsync(async () => passages = sourceId.HasValue ? await Client.PassagesAsync(sourceId.Value, page) : null);
@@ -47,5 +47,5 @@
     private async Task RemoveAsync(Guid id) => await RunAsync(async () =>
     { await Client.RemoveCitationAsync(RecordId, Location, id, Revision); await Changed.InvokeAsync(); });
     private async Task RunAsync(Func<Task> action)
-    { busy = true; error = null; try { await action(); } catch (HttpRequestException ex) { error = ex.Message; } catch (TaskCanceledException) { error = "Request timed out. Reload before retrying."; } finally { busy = false; } }
+    { busy = true; error = null; try { await action(); } catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); } catch (TaskCanceledException) { error = "Request timed out. Reload before retrying."; } finally { busy = false; } }
 }

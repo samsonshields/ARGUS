@@ -66,7 +66,7 @@ public sealed class ProcessingRunner(ArgusDbContext db, SourceService sources, P
             job.Complete(result.Entities.Select(x => (x.Start, x.End, x.Type)).Distinct().Count());
             jobs.Audit(job, "Completed");
             await db.SaveChangesAsync(ct);
-            logger.LogInformation("Entity job {JobId} completed with {CandidateCount} candidates", job.Id, job.CandidateCount);
+            logger.LogInformation("Processing job {JobId} ({Kind}) completed with {CandidateCount} candidates", job.Id, job.Kind, job.CandidateCount);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -101,7 +101,7 @@ public sealed class ProcessingRunner(ArgusDbContext db, SourceService sources, P
             }
             jobs.Audit(job, job.State == JobState.PENDING ? "RetryScheduled" : "Failed");
             await db.SaveChangesAsync(ct);
-            logger.LogWarning("Entity job {JobId} failed with code {FailureCode}; attempt {Attempt}", job.Id, failure.Code, job.Attempts);
+            logger.LogWarning("Processing job {JobId} ({Kind}) failed with code {FailureCode}; attempt {Attempt}", job.Id, job.Kind, failure.Code, job.Attempts);
         }
         return true;
     }

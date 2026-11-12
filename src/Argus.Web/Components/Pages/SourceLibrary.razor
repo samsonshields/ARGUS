@@ -4,10 +4,11 @@
 @inject InvestigationClient Investigations
 @inject NavigationManager Navigation
 <PageTitle>ARGUS | Source library</PageTitle>
+<InvestigationNav Id="Id" />
 <a href="@($"/investigations/{Id}")">Investigation overview</a>
 <p class="eyebrow">@investigation?.Title / SOURCE LIBRARY</p>
 <h1>Sources</h1>
-@if (error is not null) { <p role="alert" class="error">@error</p> }
+@if (error is not null) { <ErrorNotice Message="@error" /> }
 @if (duplicateId.HasValue) { <a href="@($"/sources/{duplicateId}")">Open existing source</a> }
 @if (loading) { <p role="status">Loading sources...</p> }
 else if (investigation is not null && limits is not null)
@@ -83,7 +84,7 @@ else if (investigation is not null && limits is not null)
     {
         searching = true; error = null;
         try { items = await Sources.ListAsync(Id, search, from, to); }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { error = "Search timed out. Retry."; }
         finally { searching = false; }
     }

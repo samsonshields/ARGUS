@@ -8,10 +8,11 @@
 @inject IntelligenceApiClient Intelligence
 @inject IJSRuntime JS
 <PageTitle>ARGUS | Geography</PageTitle>
+<InvestigationNav Id="Id" />
 <a href="@($"/investigations/{Id}")">Investigation overview</a> · <a href="@($"/investigations/{Id}/timeline")">Timeline</a>
 <p class="eyebrow">GEOGRAPHY / REVIEWED LOCATIONS</p><h1>Investigation geography</h1>
 <p class="muted">Only approved locations with selected or verified coordinates appear. Amber circles show an approximate location's uncertainty radius. Purple rings mark events.</p>
-@if (error is not null) { <p role="alert" class="error">@error</p> }
+@if (error is not null) { <ErrorNotice Message="@error" /> }
 @if (message is not null) { <p role="status" class="success">@message</p> }
 <div class="filters graph-filters">
     <label>Event type<select aria-label="Map event type" @bind="type"><option value="">All types</option>@foreach (var t in Enum.GetValues<EventType>()) { <option>@t</option> }</select></label>
@@ -26,8 +27,8 @@
 <p class="muted">The coordinate grid works offline. Loading the optional online basemap sends viewport tile requests to OpenStreetMap. Attribution and browser caching are retained; no tile downloads or geocoding are performed.</p>
 @if (tileError) { <p role="status">Online tiles are unavailable. The coordinate grid and reviewed markers remain usable.</p> }
 <div class="map-canvas" @ref="canvas" role="region" aria-label="Investigation map" tabindex="0"></div>
-@if (data is null) { <p role="status">Loading geography…</p> }
-else
+@if (data is null && error is null) { <p role="status">Loading geography…</p> }
+else if (data is not null)
 {
     <p>@data.Locations.Count approved mapped locations · @data.Events.Count event markers</p>
     @if (data.Locations.Count == 0) { <p class="panel">No approved locations have known coordinates. Create and cite a location profile, then approve it.</p> }
@@ -160,7 +161,7 @@ else
     private async Task ToggleTilesAsync() { if (module is null) return; online = !online; tileError = false; await module.InvokeVoidAsync("basemap", canvas, online); }
     private async Task SaveFocusAsync() => await RunAsync(async () => { if (module is null) return; var focus = await module.InvokeAsync<MapFocusRequest>("focus", canvas); await Client.FocusAsync(Id, focus); message = "Geographic focus saved."; });
     private async Task RunAsync(Func<Task> action)
-    { busy = true; error = null; message = null; try { await action(); } catch (HttpRequestException ex) { error = ex.Message; } catch (TaskCanceledException) { error = "Request timed out. Refresh before retrying."; } catch (JSException) { error = "Map interaction failed. Refresh to retry."; } finally { busy = false; } }
+    { busy = true; error = null; message = null; try { await action(); } catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); } catch (TaskCanceledException) { error = "Request timed out. Refresh before retrying."; } catch (JSException) { error = "Map interaction failed. Refresh to retry."; } finally { busy = false; } }
     public async ValueTask DisposeAsync()
     {
         if (module is not null) { try { await module.InvokeVoidAsync("dispose", canvas); await module.DisposeAsync(); } catch (JSDisconnectedException) { } }

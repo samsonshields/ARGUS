@@ -3,10 +3,11 @@
 @using Argus.Web.Components.Shared
 @inject AssessmentApiClient Client
 <PageTitle>ARGUS | Assessments</PageTitle>
+<InvestigationNav Id="Id" />
 <a href="@($"/investigations/{Id}")">Investigation overview</a> · <a href="@($"/investigations/{Id}/reports")">Reports</a>
 <p class="eyebrow">ASSESSMENTS / ANALYST REVIEW</p><h1>Claims and evidence</h1>
 <p class="muted">Keep source observations separate from analyst interpretation. Approval records your review; it does not mean independent verification. Confidence is a manual assessment, not a probability.</p>
-@if (error is not null) { <p class="error" role="alert">@error</p> }
+@if (error is not null) { <ErrorNotice Message="@error" /> }
 @if (message is not null) { <p role="status" class="success">@message</p> }
 @if (summary is not null) { <p>@summary.Proposed proposed · @summary.Approved approved · @summary.Rejected rejected · @summary.UnresolvedContradictions with unresolved contradictions (@summary.ApprovedWithUnresolvedContradictions approved)</p> }
 <fieldset class="filters graph-filters" disabled="@(!interactive || busy)" data-assessment-ready="@interactive.ToString().ToLowerInvariant()">
@@ -16,8 +17,8 @@
     <label><input type="checkbox" @bind="unresolved" />Unresolved contradictions only</label><button @onclick="FilterAsync">Apply claim filters</button>
 </fieldset>
 <div class="actions"><button disabled="@(busy || !interactive)" @onclick="New">Create claim</button><button disabled="@busy" @onclick="ReloadAsync">Refresh assessments</button></div>
-@if (items is null) { <p role="status">Loading assessments…</p> }
-else
+@if (items is null && error is null) { <p role="status">Loading assessments…</p> }
+else if (items is not null)
 {
     <p>@items.Total claims · page @(page)</p>
     @if (items.Total == 0) { <p class="panel">No claims match these filters. Create a claim and attach specific source passages.</p> }
@@ -86,5 +87,5 @@ else
         await LoadAsync(); message = $"Claim action completed: {action}.";
     });
     private async Task RunAsync(Func<Task> action)
-    { busy = true; error = null; message = null; try { await action(); } catch (HttpRequestException ex) { error = ex.Message; } catch (TaskCanceledException) { error = "Request timed out. Reload before retrying."; } finally { busy = false; } }
+    { busy = true; error = null; message = null; try { await action(); } catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); } catch (TaskCanceledException) { error = "Request timed out. Reload before retrying."; } finally { busy = false; } }
 }

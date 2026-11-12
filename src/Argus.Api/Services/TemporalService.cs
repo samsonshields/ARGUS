@@ -22,9 +22,7 @@ public sealed class TemporalService(ArgusDbContext db, IEventClient client)
         var count = await query.CountAsync(ct);
         var items = await query.OrderBy(x => x.StartAt == null).ThenBy(x => x.StartAt).ThenBy(x => x.Title).ThenBy(x => x.Id)
             .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
-        var result = new List<EventResponse>();
-        foreach (var item in items) result.Add(await EventResponseAsync(item, ct));
-        return new(result, count, page, pageSize);
+        return new(await EventResponsesAsync(items, ct), count, page, pageSize);
     }
     private IQueryable<AnalysisEvent> EventQuery(Guid id, ReviewStatus? status, EventType? type, DateOnly? from, DateOnly? to, bool includeUnknown)
     {
@@ -76,9 +74,7 @@ public sealed class TemporalService(ArgusDbContext db, IEventClient client)
         await InvestigationAsync(id, ct);
         var items = await db.Locations.Where(x => x.InvestigationId == id && x.DeletedAt == null).OrderBy(x => x.Id).Take(2001).ToListAsync(ct);
         if (items.Count > 2000) throw new SourceException(422, "Location limit is 2000 per investigation.");
-        var result = new List<LocationResponse>();
-        foreach (var item in items) result.Add(await LocationResponseAsync(item, ct));
-        return result;
+        return await LocationResponsesAsync(items, ct);
     }
     public async Task<LocationResponse> LocationAsync(Guid id, CancellationToken ct) => await LocationResponseAsync(await FindLocationAsync(id, ct), ct);
     public async Task<LocationResponse> SaveLocationAsync(Guid investigationId, Guid? id, LocationEditRequest request, CancellationToken ct)
@@ -224,7 +220,7 @@ public sealed class TemporalService(ArgusDbContext db, IEventClient client)
         var items = await EventQuery(investigationId, ReviewStatus.APPROVED, type, from, to, includeUnknown)
             .Where(x => x.LocationId != null && ids.Contains(x.LocationId.Value)).OrderBy(x => x.StartAt).ThenBy(x => x.Id).Take(2001).ToListAsync(ct);
         if (items.Count > 2000) throw new SourceException(422, "Map event limit is 2000; narrow the filters.");
-        var events = new List<EventResponse>(); foreach (var item in items) events.Add(await EventResponseAsync(item, ct));
+        var events = await EventResponsesAsync(items, ct);
         var focus = await db.GeographicFocus.FindAsync([investigationId], ct);
         return new(locations, events, focus is null ? null : new(focus.Latitude, focus.Longitude, focus.Zoom));
     }
@@ -235,24 +231,44 @@ public sealed class TemporalService(ArgusDbContext db, IEventClient client)
         if (focus is null) db.GeographicFocus.Add(new(investigationId, request)); else focus.Update(request);
         await db.SaveChangesAsync(ct);
     }
-    private async Task<EventResponse> EventResponseAsync(AnalysisEvent item, CancellationToken ct) => new(item.Id, item.InvestigationId, item.Title,
-        item.Description, item.StartAt, item.EndAt, item.DatePrecision, item.Type, item.Status, item.LocationId,
-        await db.EventEntities.Where(x => x.EventId == item.Id).Select(x => x.EntityId).ToListAsync(ct), item.OriginalDateText, item.Interpretation, item.Revision,
-        await (from e in db.EventEvidence
-               where e.EventId == item.Id && e.Active
-               join s in db.SourceTextSnapshots on e.SnapshotId equals s.Id
-               join source in db.Sources on e.SourceId equals source.Id
-               orderby e.CreatedAt, e.Id
-               select new CitationResponse(e.Id, s.Id, source.Id, source.Title, s.TextHash, e.Start, e.End, TemporalRules.Quote(s.Text, e.Start, e.End))).ToListAsync(ct));
-    private async Task<LocationResponse> LocationResponseAsync(LocationProfile item, CancellationToken ct) => new(item.Id, item.InvestigationId, item.EntityId,
-        await db.Entities.Where(x => x.Id == item.EntityId).Select(x => x.Name).SingleAsync(ct), item.Precision, item.Latitude, item.Longitude, item.UncertaintyMeters,
-        item.Basis, item.Notes, item.Status, item.Revision,
-        await (from e in db.LocationEvidence
-               where e.LocationId == item.Id && e.Active
-               join s in db.SourceTextSnapshots on e.SnapshotId equals s.Id
-               join source in db.Sources on e.SourceId equals source.Id
-               orderby e.CreatedAt, e.Id
-               select new CitationResponse(e.Id, s.Id, source.Id, source.Title, s.TextHash, e.Start, e.End, TemporalRules.Quote(s.Text, e.Start, e.End))).ToListAsync(ct));
+    private async Task<EventResponse> EventResponseAsync(AnalysisEvent item, CancellationToken ct) => (await EventResponsesAsync([item], ct)).Single();
+    private async Task<LocationResponse> LocationResponseAsync(LocationProfile item, CancellationToken ct) => (await LocationResponsesAsync([item], ct)).Single();
+    private async Task<List<EventResponse>> EventResponsesAsync(List<AnalysisEvent> items, CancellationToken ct)
+    {
+        var ids = items.Select(x => x.Id).ToArray();
+        var links = (await db.EventEntities.AsNoTracking().Where(x => ids.Contains(x.EventId)).ToListAsync(ct)).ToLookup(x => x.EventId, x => x.EntityId);
+        var evidence = (await (from e in db.EventEvidence
+                               where ids.Contains(e.EventId) && e.Active
+                               join snapshot in db.SourceTextSnapshots on e.SnapshotId equals snapshot.Id
+                               join source in db.Sources on e.SourceId equals source.Id
+                               orderby e.CreatedAt, e.Id
+                               select new
+                               {
+                                   ParentId = e.EventId,
+                                   Citation = new CitationResponse(e.Id, snapshot.Id, source.Id, source.Title, snapshot.TextHash,
+                                   e.Start, e.End, TemporalRules.Quote(snapshot.Text, e.Start, e.End))
+                               }).ToListAsync(ct)).ToLookup(x => x.ParentId, x => x.Citation);
+        return items.Select(item => new EventResponse(item.Id, item.InvestigationId, item.Title, item.Description, item.StartAt, item.EndAt,
+            item.DatePrecision, item.Type, item.Status, item.LocationId, links[item.Id].ToList(), item.OriginalDateText, item.Interpretation, item.Revision, evidence[item.Id].ToList())).ToList();
+    }
+    private async Task<List<LocationResponse>> LocationResponsesAsync(List<LocationProfile> items, CancellationToken ct)
+    {
+        var ids = items.Select(x => x.Id).ToArray(); var entityIds = items.Select(x => x.EntityId).ToArray();
+        var names = await db.Entities.Where(x => entityIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, ct);
+        var evidence = (await (from e in db.LocationEvidence
+                               where ids.Contains(e.LocationId) && e.Active
+                               join snapshot in db.SourceTextSnapshots on e.SnapshotId equals snapshot.Id
+                               join source in db.Sources on e.SourceId equals source.Id
+                               orderby e.CreatedAt, e.Id
+                               select new
+                               {
+                                   ParentId = e.LocationId,
+                                   Citation = new CitationResponse(e.Id, snapshot.Id, source.Id, source.Title, snapshot.TextHash,
+                                   e.Start, e.End, TemporalRules.Quote(snapshot.Text, e.Start, e.End))
+                               }).ToListAsync(ct)).ToLookup(x => x.ParentId, x => x.Citation);
+        return items.Select(item => new LocationResponse(item.Id, item.InvestigationId, item.EntityId, names[item.EntityId], item.Precision,
+            item.Latitude, item.Longitude, item.UncertaintyMeters, item.Basis, item.Notes, item.Status, item.Revision, evidence[item.Id].ToList())).ToList();
+    }
     private async Task InvestigationAsync(Guid id, CancellationToken ct)
     { if (!await db.Investigations.AnyAsync(x => x.Id == id, ct)) throw new SourceException(404, "Investigation not found."); }
     private async Task<AnalysisEvent> FindEventAsync(Guid id, CancellationToken ct) => await db.Events.SingleOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, ct)

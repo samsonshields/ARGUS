@@ -182,3 +182,14 @@ generation time. Its original contents remain unchanged after finding correction
 removal. Report reads/downloads verify the artifact hash. Finding/source approval and
 provenance validation run before insertion in the same transaction. This table is report
 history, not a database/document backup. No Phase 7 schema is introduced.
+
+## Phase 7 migration: WorkspaceQuality
+
+Adds composite indexes ClaimEvidence(ClaimId,Active,Relationship),
+EventEvidence(EventId,Active), LocationEvidence(LocationId,Active) and
+EntityMentions(EntityId,Status). It does not alter rows, review decisions or evidence.
+Collection queries use batch evidence counts/links/citations; the existing revision and
+foreign-key constraints remain in force. Backup metadata is embedded in an archive
+manifest, not a new mutable table. The archive contains a SQLite online snapshot with
+its migration history; restore checks compatibility and the referenced original files
+before installing a new data directory.

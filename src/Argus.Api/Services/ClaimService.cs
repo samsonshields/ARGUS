@@ -17,23 +17,34 @@ public sealed class ClaimService(ArgusDbContext db)
         await InvestigationAsync(id, ct);
         if ((status.HasValue && !Enum.IsDefined(status.Value)) || (confidence.HasValue && !Enum.IsDefined(confidence.Value)))
             throw new SourceException(400, "Unknown assessment filter.");
-        var query = db.Claims.Where(x => x.InvestigationId == id && x.DeletedAt == null);
+        var query = db.Claims.AsNoTracking().Where(x => x.InvestigationId == id && x.DeletedAt == null);
         if (status.HasValue) query = query.Where(x => x.Status == status);
         if (confidence.HasValue) query = query.Where(x => x.ConfidenceLevel == confidence);
         if (unresolvedOnly) query = query.Where(x => !x.ContradictionsResolved && db.ClaimEvidence.Any(e => e.ClaimId == x.Id && e.Active && e.Relationship == EvidenceRelationship.CONTRADICTS));
         if (!string.IsNullOrWhiteSpace(search)) { var term = search.Trim(); query = query.Where(x => x.Statement.Contains(term)); }
         var count = await query.CountAsync(ct);
         var items = await query.OrderByDescending(x => x.UpdatedAt).ThenBy(x => x.Id).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
-        var result = new List<ClaimSummary>(); foreach (var item in items) result.Add(await SummaryAsync(item, ct));
-        return new(result, count, page, pageSize);
+        var ids = items.Select(x => x.Id).ToArray();
+        var counts = await db.ClaimEvidence.Where(x => x.Active && ids.Contains(x.ClaimId)).GroupBy(x => x.ClaimId)
+            .Select(x => new
+            {
+                Id = x.Key,
+                Supports = x.Count(e => e.Relationship == EvidenceRelationship.SUPPORTS),
+                Contradicts = x.Count(e => e.Relationship == EvidenceRelationship.CONTRADICTS),
+                Context = x.Count(e => e.Relationship == EvidenceRelationship.CONTEXT)
+            })
+            .ToDictionaryAsync(x => x.Id, ct);
+        return new(items.Select(item => { var tally = counts.GetValueOrDefault(item.Id); return Summary(item, tally?.Supports ?? 0, tally?.Contradicts ?? 0, tally?.Context ?? 0); }).ToList(), count, page, pageSize);
     }
     public async Task<AssessmentSummary> SummaryAsync(Guid id, CancellationToken ct)
     {
         await InvestigationAsync(id, ct);
-        var query = db.Claims.Where(x => x.InvestigationId == id && x.DeletedAt == null);
+        var query = db.Claims.AsNoTracking().Where(x => x.InvestigationId == id && x.DeletedAt == null);
         var unresolved = query.Where(x => !x.ContradictionsResolved && db.ClaimEvidence.Any(e => e.ClaimId == x.Id && e.Active && e.Relationship == EvidenceRelationship.CONTRADICTS));
-        return new(await query.CountAsync(x => x.Status == ReviewStatus.PROPOSED, ct), await query.CountAsync(x => x.Status == ReviewStatus.APPROVED, ct),
-            await query.CountAsync(x => x.Status == ReviewStatus.REJECTED, ct), await unresolved.CountAsync(ct), await unresolved.CountAsync(x => x.Status == ReviewStatus.APPROVED, ct));
+        var totals = await query.GroupBy(x => x.Status).Select(x => new { Status = x.Key, Count = x.Count() }).ToDictionaryAsync(x => x.Status, x => x.Count, ct);
+        var conflicts = await unresolved.GroupBy(x => x.Status).Select(x => new { Status = x.Key, Count = x.Count() }).ToDictionaryAsync(x => x.Status, x => x.Count, ct);
+        return new(totals.GetValueOrDefault(ReviewStatus.PROPOSED), totals.GetValueOrDefault(ReviewStatus.APPROVED), totals.GetValueOrDefault(ReviewStatus.REJECTED),
+            conflicts.Values.Sum(), conflicts.GetValueOrDefault(ReviewStatus.APPROVED));
     }
     public async Task<ClaimDetail> GetAsync(Guid id, CancellationToken ct)
     {
@@ -45,7 +56,7 @@ public sealed class ClaimService(ArgusDbContext db)
                               orderby e.CreatedAt, e.Id
                               select new ClaimEvidenceResponse(e.Id, source.Id, source.Title, source.Reliability, snapshot.Id, snapshot.TextHash,
                                   e.Start, e.End, TemporalRules.Quote(snapshot.Text, e.Start, e.End), e.Relationship, e.Notes)).ToListAsync(ct);
-        return new(await SummaryAsync(item, ct), item.Reasoning, item.ContradictionsResolved, item.ContradictionResolution, item.CreatedAt, evidence);
+        return new(Summary(item, evidence.Count(x => x.Relationship == EvidenceRelationship.SUPPORTS), evidence.Count(x => x.Relationship == EvidenceRelationship.CONTRADICTS), evidence.Count(x => x.Relationship == EvidenceRelationship.CONTEXT)), item.Reasoning, item.ContradictionsResolved, item.ContradictionResolution, item.CreatedAt, evidence);
     }
     public async Task<ClaimDetail> SaveAsync(Guid investigationId, Guid? id, ClaimEditRequest request, CancellationToken ct)
     {
@@ -115,13 +126,8 @@ public sealed class ClaimService(ArgusDbContext db)
         if (!request.Confirm) throw new SourceException(400, "Confirm removal; citations and report snapshots will be retained.");
         var before = JsonSerializer.Serialize(item); item.Remove(); Audit(item, "Removed", item, before); await db.SaveChangesAsync(ct);
     }
-    private async Task<ClaimSummary> SummaryAsync(Claim item, CancellationToken ct)
-    {
-        var evidence = await db.ClaimEvidence.Where(x => x.ClaimId == item.Id && x.Active).Select(x => x.Relationship).ToListAsync(ct);
-        var contradicts = evidence.Count(x => x == EvidenceRelationship.CONTRADICTS);
-        return new(item.Id, item.InvestigationId, item.Statement, item.ConfidenceLevel, item.Status, evidence.Count(x => x == EvidenceRelationship.SUPPORTS),
-            contradicts, evidence.Count(x => x == EvidenceRelationship.CONTEXT), contradicts > 0 && !item.ContradictionsResolved, item.Revision, item.UpdatedAt);
-    }
+    private static ClaimSummary Summary(Claim item, int supports, int contradicts, int context) => new(item.Id, item.InvestigationId, item.Statement,
+        item.ConfidenceLevel, item.Status, supports, contradicts, context, contradicts > 0 && !item.ContradictionsResolved, item.Revision, item.UpdatedAt);
     private async Task<Claim> FindAsync(Guid id, CancellationToken ct) => await db.Claims.SingleOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, ct) ?? throw new SourceException(404, "Claim not found.");
     private async Task InvestigationAsync(Guid id, CancellationToken ct)
     { if (!await db.Investigations.AnyAsync(x => x.Id == id, ct)) throw new SourceException(404, "Investigation not found."); }

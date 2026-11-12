@@ -193,4 +193,14 @@ All earlier APIs remain compatible. Phase 6 additions follow below.
 
 See [assessment/report contracts](assessment-contracts.md) for claims, evidence
 classifications, analyst confidence/review, summaries, report validation/history and
-Markdown attachments. Phase 7 backup APIs remain absent.
+Markdown attachments. Phase 7 backup export is documented below.
+
+## Phase 7 additions
+
+`POST /api/v1/backups/export` streams a consistent workspace ZIP with a checksum manifest.
+The Web download proxy is GET `/downloads/backups`; the user-facing page is
+`/workspace-backup`. Recovery is an offline CLI operation into a new directory, with no
+HTTP endpoint that overwrites a live database. See [quality/recovery contracts](quality-contracts.md).
+Request completion diagnostics return `X-Argus-TraceId`; errors remain Problem Details.
+Existing review/list contracts are compatible; batched queries preserve their data and
+ordering. Multi-user/collaboration endpoints remain absent.
