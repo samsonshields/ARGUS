@@ -45,7 +45,7 @@ public sealed class InvestigationClient(HttpClient http)
             if (problem.TryGetProperty("errors", out var errors))
                 throw new SourceHttpException(string.Join(" ", errors.EnumerateObject()
                     .SelectMany(x => x.Value.EnumerateArray().Select(v => v.GetString()))), response.StatusCode);
-            Guid? existing = problem.TryGetProperty("existingSourceId", out var duplicate) && duplicate.TryGetGuid(out var id) ? id : null;
+            Guid? existing = problem.TryGetProperty("existingSourceId", out var duplicate) && duplicate.ValueKind == JsonValueKind.String && duplicate.TryGetGuid(out var id) ? id : null;
             if (problem.TryGetProperty("title", out var title)) throw new SourceHttpException(title.GetString() ?? "Request failed.", response.StatusCode, existing);
         }
         throw new HttpRequestException($"API request failed ({(int)response.StatusCode}). Please try again.");

@@ -1,4 +1,4 @@
-# Architecture through Phase 2
+# Architecture through Phase 3
 
 The repository root is the proposed argus monorepo root. The supplied specification
 is project_specifications.md; the requested hyphenated filename is absent. There was
@@ -24,8 +24,8 @@ Dashboard counts reflect investigations and Phase 2 source/extraction totals. Re
 investigation updates are not a full audit history. Later-phase metrics/navigation are omitted. Blazor
 built-in forms/custom CSS avoid an unnecessary shell dependency; MudBlazor remains optional.
 
-Python 3.14.6 meets the specified minimum. FastAPI/spaCy dependencies and compatibility
-checks belong to Phase 3; the smoke script needs only the standard library.
+Python 3.14.6 meets the specified minimum. Phase 3 uses verified FastAPI/spaCy wheels
+and a trained local English model; the smoke scripts themselves use the standard library.
 No authentication, public deployment hardening, pagination or concurrent edit conflict
 handling is included. Last saved edit wins. Loopback defaults support local use.
 
@@ -64,5 +64,50 @@ the temporary database path. The first Phase 2 run exposed an earlier eager-reso
 bug: synthetic rows/files landed in the default database. Those identified artifacts
 were backed up and removed; the fix and isolation regression check are in place.
 
-Synchronous request-scoped text extraction is deliberate. Durable processing jobs,
-FastAPI, named entities and NLP integration remain unimplemented until Phase 3.
+Synchronous request-scoped text extraction was the Phase 2 behavior. Phase 3 moves
+default import processing into the worker while retaining explicit text-only compatibility.
+
+## Phase 3: persistent local NLP and analyst review
+
+Default uploads preserve originals and atomically insert source/audit/job records,
+then return a Pending source. IntelligenceWorker polls persisted pending work and
+ProcessingRunner claims one job, extracts text, snapshots its exact contents, sends a
+versioned JSON contract to FastAPI and validates the returned spans before saving
+PROPOSED mentions. HTTP timeout, response-size, document and candidate limits are bounded.
+The Python service is stateless with no database/storage dependencies or remote inference.
+It loads only an installed English spaCy NER pipeline; unavailable models return 503.
+
+Worker execution uses scoped services and a single local worker; no database transaction
+is held across extraction/HTTP. A filtered active-job unique index prevents duplicate
+queueing. Transient failures schedule bounded retries; explicit manual retries create
+new history entries. RUNNING jobs recover on startup while keeping their attempt budget.
+Job cancellation/review use optimistic revision tokens so late/stale results cannot win.
+Cancellation does not kill an inference already running in the independent Python service.
+
+Immutable SourceTextSnapshots identify text by source/hash. Mentions use exact UTF-16
+spans, including surrogate-pair boundary checks. Reprocessing identical text reuses
+snapshot/span/type records and preserves decisions; extraction changes never invalidate
+old approved evidence. Confidence is null, not a fabricated model probability.
+
+EntityReviewService creates canonical records only when an analyst approves a proposed
+mention. Exact normalized names, aliases and deterministic Levenshtein-based similarity
+produce suggestions; no person is automatically merged or associated by name. Existing
+records require explicit selection. Confirmed merges move approved mention links,
+retain the former record, preserve aliases and audit before/after state. Original text,
+model labels and snapshot references are immutable. Revision tokens protect association,
+correction and merge races; composite FKs prevent cross-investigation entity links.
+
+Blazor centralizes these APIs in IntelligenceApiClient. Source/investigation review
+panels show proposed/approved/rejected mentions and escaped highlighted evidence;
+entity pages support corrections, paginated target selection and confirmed merging.
+Job panels poll every two seconds and support cancellation/retry/readiness checks.
+New collection APIs are paginated; legacy investigation/source arrays remain compatible.
+.NET publishes OpenAPI JSON; Python publishes OpenAPI and its documentation UI.
+
+The tested stack is Python 3.14.6, spaCy 3.8.18, en_core_web_sm 3.8.0, FastAPI 0.162.4,
+Pydantic 2.14.3 and Uvicorn 0.54.0. Pinning Microsoft.OpenApi to patched 2.7.5 avoids
+the vulnerable 2.0.0 transitive dependency of ASP.NET OpenAPI 10.0.2. Dependency/model
+installation needs internet; runtime processing uses existing local assets offline.
+
+No co-occurrence, relationship extraction, graph models/algorithms, Cytoscape, timelines
+or maps are implemented. Phase 4 remains untouched. See nlp-contracts.md for wire details.

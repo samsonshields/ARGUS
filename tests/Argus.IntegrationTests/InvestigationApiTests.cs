@@ -19,7 +19,12 @@ public sealed class TestApi(string directory, Dictionary<string, string?>? setti
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureAppConfiguration((_, config) =>
-            config.AddInMemoryCollection(new Dictionary<string, string?> { ["ARGUS_DATA_DIRECTORY"] = directory })
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ARGUS_DATA_DIRECTORY"] = directory,
+                ["Intelligence:WorkerEnabled"] = "false",
+                ["Intelligence:AutoProcessImports"] = "false"
+            })
                 .AddInMemoryCollection(settings ?? []));
         builder.ConfigureServices(services => configure?.Invoke(services));
     }
@@ -108,7 +113,7 @@ public sealed class InvestigationApiTests : IDisposable
         using var client = factory.CreateClient();
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ArgusDbContext>();
-        Assert.Equal(2, (await db.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(3, (await db.Database.GetAppliedMigrationsAsync()).Count());
         Assert.Empty(await db.Database.GetPendingMigrationsAsync());
         await Assert.ThrowsAsync<Microsoft.Data.Sqlite.SqliteException>(() => db.Database.ExecuteSqlRawAsync(
             "INSERT INTO Investigations (Id,Title,Description,Status,CreatedAt,UpdatedAt) VALUES ('bad',' ','','Active','2026-01-01','2026-01-01')"));

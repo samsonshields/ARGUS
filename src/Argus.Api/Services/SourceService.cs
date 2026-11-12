@@ -10,11 +10,12 @@ using Argus.Infrastructure.Data;
 using Argus.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Argus.Infrastructure.ExternalServices;
 
 namespace Argus.Api.Services;
 
 public sealed class SourceService(ArgusDbContext db, DocumentStorage storage, IDocumentExtractor extractor,
-    IOptions<DocumentOptions> options, ILogger<SourceService> logger)
+    IOptions<DocumentOptions> options, ILogger<SourceService> logger, ProcessingJobService jobs, IOptions<IntelligenceOptions> intelligenceOptions)
 {
     public async Task<SourceStatistics> StatisticsAsync(CancellationToken ct)
     {
@@ -66,7 +67,8 @@ public sealed class SourceService(ArgusDbContext db, DocumentStorage storage, ID
         await storage.SaveAsync(source.FilePath, bytes, ct);
         try
         {
-            await ExtractAsync(source, ct);
+            if (intelligenceOptions.Value.AutoProcessImports) jobs.AddForImport(source);
+            else await ExtractAsync(source, ct);
             db.Sources.Add(source);
             Audit(source, "Imported", null);
             await db.SaveChangesAsync(ct);
@@ -100,6 +102,7 @@ public sealed class SourceService(ArgusDbContext db, DocumentStorage storage, ID
 
     public async Task<SourceResponse> ReextractAsync(Guid id, CancellationToken ct)
     {
+        if (await jobs.HasActiveAsync(id, ct)) throw new SourceException(409, "An active processing job owns this source. Cancel or wait for it before text-only extraction.");
         var source = await FindAsync(id, ct);
         var before = Snapshot(source);
         await ExtractAsync(source, ct);
@@ -135,6 +138,8 @@ public sealed class SourceService(ArgusDbContext db, DocumentStorage storage, ID
             logger.LogWarning("Text extraction failed for source {SourceId}; category {FailureType}", source.Id, ex.GetType().Name);
         }
     }
+
+    internal Task ExtractForJobAsync(Source source, CancellationToken ct) => ExtractAsync(source, ct);
 
     private async Task RequireInvestigationAsync(Guid id, CancellationToken ct)
     {

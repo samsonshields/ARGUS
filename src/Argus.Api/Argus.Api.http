@@ -15,3 +15,15 @@ Accept: application/json
 ###
 GET {{Argus.Api_HostAddress}}/api/v1/source-statistics
 Accept: application/json
+
+###
+GET {{Argus.Api_HostAddress}}/api/v1/processing-jobs?page=1&pageSize=20
+Accept: application/json
+
+###
+GET {{Argus.Api_HostAddress}}/api/v1/intelligence/health
+Accept: application/json
+
+###
+GET {{Argus.Api_HostAddress}}/openapi/v1.json
+Accept: application/json

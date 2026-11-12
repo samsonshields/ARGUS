@@ -1,6 +1,6 @@
 # ARGUS development plan
 
-Current scope: Phases 1 and 2. Phase 3 has not begun.
+Current scope: Phases 1–3. Phase 4 has not begun.
 
 ## Phase 1 implementation
 
@@ -96,5 +96,65 @@ Keep database and documents together when backing up with the API stopped.
 Browser clicks/file selection and visual review remain manual checks; HTTP smoke
 verifies server-rendered routes and API behavior, not interactive Blazor circuits.
 
-Next: await user authorization for Phase 3. No FastAPI, spaCy, NLP candidates,
-processing-job subsystem, entity review, graphs, timelines or maps were implemented.
+Phase 3 was subsequently authorized and implemented below. Phase 4 remains untouched.
+
+## Phase 3 implementation
+
+- [x] Inspect current architecture and verify .NET 10.0.102 / Python 3.14.6.
+- [x] Verify compatible Python wheels, install isolated venv, spaCy/FastAPI and trained English model.
+- [x] Define versioned JSON contract with exact UTF-16 spans, SHA-256 text hashes and nullable confidence.
+- [x] Implement stateless entity extraction, deterministic label mapping, readiness/errors and request/result limits.
+- [x] Add typed .NET HTTP client with bounded full-response timeout and independent contract validation.
+- [x] Add persistent jobs and hosted worker; queue imports, extract asynchronously, retry, cancel and recover after restart.
+- [x] Add EntityProcessing migration with snapshots, entities, mentions, constrained links and active-job uniqueness.
+- [x] Retain immutable evidence and review decisions across reprocessing/extraction changes.
+- [x] Implement proposed/approved/rejected review, canonical corrections, explicit association and confirmed merges.
+- [x] Implement deterministic normalized/alias/fuzzy suggestions without automatic person merges.
+- [x] Build source/investigation review UI, highlighted evidence, entity pages and polling job monitor.
+- [x] Add paginated Phase 3 APIs, dashboard counts and .NET/Python OpenAPI documentation.
+- [x] Test domain invariants, API review/jobs, cancellation/recovery, model failures and provenance.
+- [x] Verify real three-process offline NLP/review/outage/retry/restart workflow on temporary data.
+- [x] Update setup, environment examples, contracts, architecture and schema documentation.
+- [x] Record final build/test/format/lint/migration/dependency/smoke results.
+
+## Phase 3 final verification
+
+Verified stack: .NET SDK 10.0.102/runtime 10.0.2; Python 3.14.6; spaCy 3.8.18;
+en_core_web_sm 3.8.0; FastAPI 0.162.4; Pydantic 2.14.3; Uvicorn 0.54.0.
+Completed on 2026-11-11 (America/New_York):
+
+- `dotnet build Argus.sln -c Release --no-restore`: passed, zero warnings/errors.
+- `dotnet test Argus.sln -c Release --no-build --no-restore`: **86 passed** (42 unit, 44 integration), zero failures/skips.
+- Python pytest: **28 passed**, including real-model extraction, exact Unicode spans, missing-model/invalid-request/limit/pipeline failures; one upstream test-client deprecation warning.
+- Ruff lint and format checks passed for app, Python tests and both smoke scripts.
+- `dotnet format Argus.sln --no-restore --verify-no-changes`: passed.
+- EF migration drift check: no pending model changes; Phase 1/Phase 2 upgrade tests passed.
+- NuGet transitive vulnerability audit: no known vulnerable packages reported.
+- `pip check`: no broken requirements; complete tested Python/model environment captured in requirements-lock.txt.
+- Phase 1/2 compatibility smoke: passed in explicit text-only/worker-disabled mode.
+- Real Phase 3 smoke: passed three-process startup, automatic queue/extraction/NER,
+  proposals, Unicode spans, approval/rejection, stable reprocessing, source/evidence pages,
+  service outage/bounded failures, manual retry, durable queue restart and byte-identical originals.
+- Python smoke script syntax checks passed. Temporary servers/data were cleaned up.
+
+Phase 3 automated completion gate passed. Existing normal application instances were
+not replaced; rebuild/restart them using the updated three-terminal README instructions.
+Phase 4 was not started.
+
+OpenAPI dependency restore initially detected a high-severity advisory in transitive
+Microsoft.OpenApi 2.0.0; an explicit patched 2.7.5 reference resolved it. No warning
+suppression was used. All testing uses explicit temporary data paths; normal Debug
+instances/default local databases are not used by the verification workflow.
+
+## Phase 3 known limits
+
+- English statistical NER is imperfect; all machine findings require review and confidence is null.
+- Cancellation discards late results but does not forcibly stop an already running Python inference.
+- Default NLP input is limited to 250,000 UTF-16 units; over-limit sources fail without truncation.
+- One local worker/API instance per SQLite database; source/investigation list arrays remain unpaginated for compatibility.
+- Browser clicks/file selection and visual appearance remain manually verified tasks, not completed browser tests.
+- Python tests emit one upstream Starlette/httpx deprecation warning; it does not affect passing tests/runtime.
+- Existing local security, no-OCR and potential crash-orphan limitations remain.
+
+Next: await user authorization for Phase 4. No relationships, co-occurrence pipeline,
+graph tables/algorithms, Cytoscape integration, timeline/event or map features were started.

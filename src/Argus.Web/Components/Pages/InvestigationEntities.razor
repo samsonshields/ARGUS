@@ -1,0 +1,46 @@
+@page "/investigations/{Id:guid}/entities"
+@rendermode InteractiveServer
+@inject IntelligenceApiClient Client
+@inject InvestigationClient Investigations
+<PageTitle>ARGUS | Entities</PageTitle>
+<a href="@($"/investigations/{Id}")">Investigation overview</a>
+<p class="eyebrow">@investigation?.Title</p><h1>Entities and review</h1>
+@if (error is not null) { <p role="alert" class="error">@error</p> }
+@if (investigation is null) { <p>Loading investigation, or investigation unavailable.</p> }
+else
+{
+    <EntityReviewPanel @key="Id" InvestigationId="Id" Reviewed="LoadAsync" />
+    <h2>Approved entities</h2>
+    <form @onsubmit="SearchAsync" @onsubmit:preventDefault class="filters"><label>Canonical name<input @bind="search" maxlength="200" /></label><button type="submit">Search entities</button></form>
+    @if (items is null) { <p role="status">Loading entities...</p> }
+    else
+    {
+        @if (items.Total == 0) { <p class="panel">No approved entities match this view.</p> }
+        @foreach (var entity in items.Items)
+        { <a class="investigation-row" href="@($"/entities/{entity.Id}")"><strong>@entity.Name</strong><span>@entity.Type / @entity.MentionCount approved mentions</span></a> }
+        <div class="actions"><button disabled="@(page == 1)" @onclick="() => PageAsync(-1)">Previous entities</button><span>Page @(page) / @items.Total entities</span>
+            <button disabled="@(page * items.PageSize >= items.Total)" @onclick="() => PageAsync(1)">Next entities</button></div>
+    }
+}
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private InvestigationResponse? investigation;
+    private PageResult<EntityResponse>? items;
+    private string? error;
+    private string search = "";
+    private int page = 1;
+    protected override async Task OnParametersSetAsync()
+    {
+        try { investigation = await Investigations.GetAsync(Id); if (investigation is null) error = "Investigation not found."; else await LoadAsync(); }
+        catch (HttpRequestException) { error = "Unable to load investigation. Check the API."; }
+        catch (TaskCanceledException) { error = "Investigation loading timed out."; }
+    }
+    private async Task LoadAsync()
+    {
+        try { items = await Client.EntitiesAsync(Id, search, page); }
+        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (TaskCanceledException) { error = "Entity loading timed out."; }
+    }
+    private async Task SearchAsync() { page = 1; await LoadAsync(); }
+    private async Task PageAsync(int delta) { page += delta; await LoadAsync(); }
+}

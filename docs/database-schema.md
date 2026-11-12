@@ -1,4 +1,4 @@
-# Database schema (Phases 1 and 2)
+# Database schema (Phases 1–3)
 
 File: API data directory / argus.db. Committed migrations and snapshot are under
 src/Argus.Infrastructure/Data/Migrations. Initial migration creates Investigations:
@@ -55,3 +55,45 @@ Database/audit changes commit atomically. Failed commits remove the new unrefere
 file; extraction failures preserve originals in a Failed source. Filesystem and SQLite
 cannot share a transaction: a hard process/machine crash can leave an orphan file.
 Automated orphan cleanup is deliberately absent to avoid deleting evidence.
+
+## Phase 3 migration: EntityProcessing
+
+The migration expands the source status constraint to Ready/Failed/Pending/Processing
+and adds four tables. Phase 2 upgrades preserve existing source metadata, text,
+hashes and original references; this upgrade is integration-tested with real stored bytes.
+Existing sources are not automatically queued during migration.
+
+| Table | Important fields and invariants |
+| --- | --- |
+| ProcessingJobs | GUID Id/SourceId/InvestigationId; State; Attempts; ErrorCode/Error; UTC CreatedAt/UpdatedAt/NextAttemptAt; nullable SnapshotId; CandidateCount; Revision concurrency token |
+| SourceTextSnapshots | GUID Id/SourceId; immutable Text; SHA-256 TextHash; UTC CreatedAt; unique SourceId+TextHash |
+| Entities | GUID Id/InvestigationId; Name; NormalizedName; Type; AliasesJson; nullable MergedIntoId; Revision concurrency token |
+| EntityMentions | GUID Id/SourceId/InvestigationId/SnapshotId/ProcessingJobId; immutable Text/OriginalType/Start/End/ModelName/ModelVersion; Status; optional EntityId/ReviewedAt; Revision concurrency token |
+
+ProcessingJobs has a filtered unique SourceId index for PENDING/RUNNING and a
+State+NextAttemptAt index for worker polling. Jobs reference sources, investigations
+and snapshots with RESTRICT foreign keys. Attempts increment when claimed and remain
+bounded through recovery; manual retry creates a new persisted job/history entry.
+
+Mentions uniquely identify SnapshotId+Start+End+OriginalType. CHECK constraints enforce
+nonempty positive spans and require EntityId only for APPROVED mentions. Composite
+foreign keys ensure the snapshot belongs to the same source and an approved entity
+belongs to the same investigation. Mentions retain first-generation model/job provenance;
+reprocessing never silently resets approval/rejection or deletes reviewed evidence.
+
+Entities are created only through analyst approval. Names are deliberately not unique:
+two people with the same name must remain distinct until the analyst explicitly chooses
+association/merge. Index: InvestigationId+NormalizedName. MergedIntoId has a composite
+same-investigation self-reference. Retired records remain present, preserving history.
+Aliases are preserved from renames and merges; original mention strings never change.
+
+Snapshot insertion/source extraction commits before the HTTP NLP call, without holding
+a database transaction over network I/O. Validated candidate insertion, job completion
+and its audit event commit together. Optimistic revision checks prevent a cancelled job
+from committing late results and prevent stale review/merge updates. Python never writes
+these tables. One local API/worker instance owns a database.
+
+SourceState Ready indicates text extraction, not NLP approval or job success. NLP
+readiness/failures are represented in ProcessingJobs. Full text snapshots intentionally
+consume additional local storage to retain exact evidence across extraction upgrades.
+There are no relationship or graph tables in this migration.

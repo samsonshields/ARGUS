@@ -1,19 +1,42 @@
 # ARGUS
 
-Local-first OSINT analysis workstation for Windows. Phases 1 and 2 provide investigation
-management and a source library: import text/PDF files or pasted text, preserve originals,
-search extracted content, edit attribution/reliability and retry text extraction.
-Phase 3 has not begun.
+Local-first OSINT analysis workstation for Windows. Phases 1–3 provide investigations,
+preserved source documents, asynchronous local entity recognition and analyst review.
+Approve/correct/reject mentions, inspect exact source evidence, associate mentions
+with existing entities and explicitly merge duplicate records. **Phase 4 has not begun.**
 
 ## Requirements
 
 - .NET 10 SDK (verified SDK 10.0.102, runtime 10.0.2). SDK pinned in global.json.
-- Python 3.12+ for the optional smoke script (verified 3.14.6).
-- Internet access for initial NuGet/tool restore. No Docker, Node, paid APIs or Python packages required.
+- Python 3.12+ with a virtual environment (verified 3.14.6, Windows x64).
+- Internet access for initial NuGet/Python/model installation. Runtime processing is offline.
+- No Docker, Node, external LLMs or paid APIs required.
 
 ## Local startup
 
 From the repository root in PowerShell:
+
+```powershell
+python -m venv intelligence-service/.venv
+intelligence-service/.venv/Scripts/python.exe -m pip install -r intelligence-service/requirements-dev.txt
+intelligence-service/.venv/Scripts/python.exe -m spacy download en_core_web_sm
+intelligence-service/.venv/Scripts/python.exe -m pip check
+```
+
+Tested: spaCy 3.8.18, FastAPI 0.162.4, Pydantic 2.14.3, Uvicorn 0.54.0 and
+`en_core_web_sm` 3.8.0. `intelligence-service/requirements-lock.txt` captures the full
+tested environment, including the pinned model URL/hash; install that instead of
+requirements-dev/model download to reproduce the Windows/Python 3.14 environment.
+No model download is attempted by the running service. A missing/incompatible model
+returns a 503 readiness error; restart the service after installing the model.
+
+Start the local NLP service in one terminal:
+
+```powershell
+intelligence-service/.venv/Scripts/python.exe -m uvicorn app.main:app --app-dir intelligence-service --host 127.0.0.1 --port 8000
+```
+
+Start the API in another terminal:
 
 ```powershell
 dotnet tool restore
@@ -22,16 +45,18 @@ dotnet build Argus.sln --no-restore
 dotnet run --project src/Argus.Api --no-build --launch-profile http
 ```
 
-In a second terminal:
+Start Web in a third terminal:
 
 ```powershell
 dotnet run --project src/Argus.Web --no-build --launch-profile http
 ```
 
 Open **http://localhost:5200**. API: **http://localhost:5100**; health: `/health`.
+NLP readiness: **http://localhost:8000/health**; interactive NLP contract docs: `/docs`.
+.NET OpenAPI: **http://localhost:5100/openapi/v1.json**.
 Stop each application with Ctrl+C. Stop existing instances before rebuilding. API startup applies committed migrations before
 serving requests. Default database: `src/Argus.Api/data/argus.db` using these commands.
-Keep the complete data directory (database and `documents/`) between restarts. No network is required for normal local use.
+Keep the complete data directory (database and `documents/`) between restarts. No internet connection is required for normal local use.
 
 Set `$env:ARGUS_DATA_DIRECTORY = 'C:/Argus/data'` in the API terminal to override
 storage. Set `$env:Api__BaseUrl = 'http://localhost:5100'` in the Web terminal to
@@ -51,6 +76,10 @@ dotnet ef database update --project src/Argus.Infrastructure --startup-project s
 dotnet test Argus.sln --no-restore
 dotnet format Argus.sln --no-restore --verify-no-changes
 python scripts/smoke.py
+python scripts/smoke_nlp.py
+intelligence-service/.venv/Scripts/python.exe -m pytest intelligence-service/tests -q -c intelligence-service/pyproject.toml
+intelligence-service/.venv/Scripts/python.exe -m ruff check intelligence-service/app intelligence-service/tests
+intelligence-service/.venv/Scripts/python.exe -m ruff format --check intelligence-service/app intelligence-service/tests
 ```
 
 The smoke script defaults to a Debug build. It launches temporary loopback API/Web
@@ -58,6 +87,10 @@ processes, checks rendered pages/CSS, imports text/PDF/pasted sources, verifies 
 duplicates, failures, search, downloads, extraction retry and restart persistence.
 It cleans up its processes and temporary database; diagnostics
 are in ignored `.local/smoke.log`. It does not drive browser clicks or Blazor circuits.
+The compatibility smoke explicitly disables automatic NLP and the worker to test
+Phase 1/2 APIs in isolation. `smoke_nlp.py` launches all three real processes with
+automatic processing enabled, tests entity review, service outage/retry and queued
+work across restarts. It requires the installed venv/model and writes `.local/smoke-nlp.log`.
 
 Manual UI check: create an investigation, edit its scope/status, filter by Archived,
 cancel a deletion, restart both apps, reopen the record, and confirm deletion.
@@ -81,8 +114,10 @@ Uploading the same bytes again within one investigation returns a duplicate erro
 a link to the existing source. The same document may be used in different investigations.
 Investigations containing sources are protected from deletion; archive them instead.
 
-Malformed PDFs, scanned/image-only PDFs, unsupported encodings and extraction-limit
-failures retain their original files and show a Failed status with a safe error message.
+New imports return promptly after preserving the original and queuing a persistent
+job. Text extraction and NLP run in the background. Malformed PDFs, scanned/image-only
+PDFs, unsupported encodings and extraction-limit failures retain their originals
+and show a Failed source/job with a safe error message.
 Retry replaces extracted text only on success; previous successful text survives failures.
 There is no OCR. PDF layout/text order can vary; use the original when checking citations.
 
@@ -99,7 +134,7 @@ Supported text: strict UTF-8, or BOM-marked UTF-16/32. Originals are byte-preser
 extracted text uses LF line endings and trims outer whitespace/BOM. PDF extraction uses
 PdfPig 0.1.16 in a child mode of the installed API executable; it requires `dotnet` on PATH,
 has a 256 MiB managed heap cap, and is terminated on timeout. Files are parsed as data,
-never executed. One extraction runs at a time; persistent background/NLP jobs belong to Phase 3.
+never executed. One extraction and one background job run at a time.
 Keep a stopped-application backup of the complete data directory. A hard crash between
 file creation and database commit can leave an unreferenced file; there is no automatic
 orphan cleanup. Do not delete preserved documents manually.
@@ -107,6 +142,52 @@ orphan cleanup. Do not delete preserved documents manually.
 Manual Phase 2 UI check: upload both fixtures, reopen after restarting, search for
 `logistics`, filter by publication date, try a duplicate and an unsupported file,
 paste a source, update reliability, retry extraction, and download the original.
+
+## Process and review entities
+
+Imports automatically queue processing. Existing Phase 2 sources are not processed
+retroactively; open a source and select **Queue entity processing**. The source page
+and **Processing jobs** monitor refresh job state every two seconds. You can cancel
+active jobs or retry failed/cancelled jobs. Text-only retry remains available when
+there is no active job, for troubleshooting extraction without NLP.
+
+Once processing completes, use **Entity review** on the source or investigation page.
+Select a proposed mention to see its exact highlighted passage, original model label,
+model version and evidence offsets. Correct the canonical name/type, then approve or
+reject it. Confidence remains unavailable: spaCy does not provide a calibrated probability.
+Approving creates a canonical entity or associates the mention with an explicitly
+selected suggested entity. Name similarity is not proof of identity.
+
+The approved entity page supports corrections, aliases retained from renames and
+confirmed merges. Merging moves approved mentions but keeps their original text,
+model labels and snapshot references. Records from different investigations cannot merge.
+There are no relationships, graphs or graph algorithms in this release.
+
+Jobs persist as PENDING/RUNNING/COMPLETED/FAILED/CANCELLED. Interrupted RUNNING jobs
+recover on API startup, retaining their attempt budget. Transient errors retry at most
+three attempts per job, five seconds apart by default. Start/fix Python and manually
+retry a failed job after an outage. Cancellation discards late results; it does not
+forcibly interrupt an already running Python inference. Reprocessing identical text
+reuses stable mention records and preserves approvals/rejections; changed text gets
+a new immutable snapshot, while older reviewed evidence remains accessible.
+
+NLP defaults: `Intelligence__BaseUrl=http://localhost:8000`, `Intelligence__TimeoutSeconds=30`,
+`Intelligence__MaxAttempts=3`, `Intelligence__RetryDelaySeconds=5`,
+`Intelligence__MaxTextCharacters=250000`, `Intelligence__MatchThreshold=0.85`.
+Python uses `ARGUS_SPACY_MODEL=en_core_web_sm` and `ARGUS_NLP_MAX_UTF16=250000`.
+Keep the character limits aligned. Longer documents fail clearly, without truncation.
+Offsets count UTF-16 code units, with inclusive starts and exclusive ends, indexing
+the exact preserved extracted text. See [NLP contract](docs/nlp-contracts.md).
+
+`Intelligence__WorkerEnabled=false` pauses automatic worker execution without deleting
+queued jobs. `Intelligence__AutoProcessImports=false` retains the Phase 2 synchronous
+text-only import behavior; explicit `/process` still queues NLP. These switches support
+isolated tests and diagnostics, not a production fake-NLP mode.
+
+Manual Phase 3 check: import a fictional report naming people/organizations/places;
+wait for completion; inspect a highlighted mention; approve one and reject another;
+associate a second mention explicitly; correct/merge duplicate entities; stop Python
+and observe bounded failures; restart/retry; restart API and verify reviews/evidence persist.
 
 ## Structure
 
@@ -117,13 +198,17 @@ paste a source, update reliability, retry extraction, and download the original.
 - `src/Argus.Web`: Blazor UI and centralized HTTP client; no database dependency.
 - `tests/`: domain unit tests and isolated temporary SQLite/API integration tests.
 - `scripts/`: live HTTP smoke verification.
+- `intelligence-service/`: independent FastAPI/spaCy service and Python tests; no database access.
 
 EF Core and EF tool are pinned to 10.0.2. SQLitePCLRaw bundle 3.0.5 replaces the
 vulnerable native dependency pulled by EF's default bundle. Native Blazor forms and
 custom CSS keep the shell small; MudBlazor compatibility was checked but it is not installed.
 
-Python processing, entities, graphs, timelines and maps are absent. Python service
-directories/contracts will be introduced in their authorized phase, without production stubs.
+Microsoft.OpenApi is pinned to patched 2.7.5 rather than the vulnerable transitive 2.0.0.
+Browser clicks/file-selection/visual review remain manual verification. English NER is
+model-dependent and may miss or misclassify entities. Python test tooling currently
+emits one upstream httpx deprecation warning; tests still pass. Graphs, relationships,
+timelines, maps and assessments remain deferred.
 
 See [specification](docs/project_specifications.md), [architecture](docs/architecture.md),
 [API contracts](docs/api-contracts.md), [schema](docs/database-schema.md) and

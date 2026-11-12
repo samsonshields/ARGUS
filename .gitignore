@@ -11,3 +11,5 @@ data/
 *.log
 TestResults/
 .local/
+.pytest_cache/
+.ruff_cache/

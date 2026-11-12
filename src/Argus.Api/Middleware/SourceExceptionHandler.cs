@@ -7,9 +7,15 @@ public sealed class SourceExceptionHandler : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext context, Exception exception, CancellationToken ct)
     {
+        if (exception is Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+        {
+            await Results.Problem(statusCode: 409, title: "The record changed concurrently. Reload and try again.",
+                extensions: new Dictionary<string, object?> { ["code"] = "concurrent_update" }).ExecuteAsync(context);
+            return true;
+        }
         if (exception is not SourceException error) return false;
         await Results.Problem(statusCode: error.StatusCode, title: error.Message,
-            extensions: error.ExistingSourceId.HasValue ? new Dictionary<string, object?> { ["existingSourceId"] = error.ExistingSourceId } : null)
+            extensions: new Dictionary<string, object?> { ["code"] = $"request_{error.StatusCode}", ["existingSourceId"] = error.ExistingSourceId })
             .ExecuteAsync(context);
         return true;
     }

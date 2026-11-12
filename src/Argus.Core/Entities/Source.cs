@@ -68,6 +68,14 @@ public sealed class Source
         ProcessingError = error;
     }
 
+    public void QueueProcessing() { ProcessingStatus = SourceProcessingStatus.Pending; }
+    public void StartProcessing() { ProcessingStatus = SourceProcessingStatus.Processing; }
+    public void CancelProcessing()
+    {
+        ProcessingStatus = ExtractedAt.HasValue ? SourceProcessingStatus.Ready : SourceProcessingStatus.Failed;
+        if (!ExtractedAt.HasValue) ProcessingError = "Processing was cancelled; the original is preserved.";
+    }
+
     public SourceSummary ToSummary() => new(Id, InvestigationId, Title, SourceType, Publisher,
         PublishedAt, RetrievedAt, Reliability, ProcessingStatus, ProcessingError, OriginalFileName, FileSize);
     public SourceResponse ToResponse() => new(ToSummary(), OriginalUrl, ContentHash, ExtractedText, ExtractedAt, ExtractionVersion);
