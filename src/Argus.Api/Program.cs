@@ -43,6 +43,8 @@ builder.Services.AddScoped<EntityReviewService>();
 builder.Services.AddScoped<RelationshipService>();
 builder.Services.AddScoped<GraphService>();
 builder.Services.AddScoped<TemporalService>();
+builder.Services.AddScoped<ClaimService>();
+builder.Services.AddScoped<ReportService>();
 builder.Services.AddHttpClient<IEventClient, IntelligenceClient>((services, client) =>
 {
     var options = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<IntelligenceOptions>>().Value;

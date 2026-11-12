@@ -32,6 +32,11 @@ builder.Services.AddHttpClient<TemporalApiClient>((services, client) =>
     client.BaseAddress = new Uri(services.GetRequiredService<IOptions<ApiOptions>>().Value.BaseUrl);
     client.Timeout = TimeSpan.FromSeconds(40);
 });
+builder.Services.AddHttpClient<AssessmentApiClient>((services, client) =>
+{
+    client.BaseAddress = new Uri(services.GetRequiredService<IOptions<ApiOptions>>().Value.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(90);
+});
 var app = builder.Build();
 app.UseExceptionHandler("/Error", createScopeForErrors: true);
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
@@ -49,4 +54,14 @@ app.MapGet("/downloads/sources/{id:guid}", async Task<IResult> (Guid id, SourceC
     catch (TaskCanceledException) when (!ct.IsCancellationRequested) { return Results.Problem(statusCode: 504, title: "Source download timed out."); }
 });
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
+app.MapGet("/downloads/reports/{id:guid}", async Task<IResult> (Guid id, AssessmentApiClient client, HttpContext context, CancellationToken ct) =>
+{
+    try
+    {
+        var file = await client.DownloadAsync(id, ct); context.Response.Headers.XContentTypeOptions = "nosniff";
+        return Results.File(file.Content, "text/markdown; charset=utf-8", file.Name);
+    }
+    catch (HttpRequestException ex) { return Results.Problem(statusCode: (int?)ex.StatusCode ?? 502, title: "Unable to download report."); }
+    catch (TaskCanceledException) when (!ct.IsCancellationRequested) { return Results.Problem(statusCode: 504, title: "Report download timed out."); }
+});
 app.Run();

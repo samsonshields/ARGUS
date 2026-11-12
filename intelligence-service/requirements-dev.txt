@@ -3,3 +3,4 @@ pytest==9.2.0
 httpx==0.28.1
 ruff==0.17.4
 playwright==1.65.1
+markdown-it-py==4.3.0

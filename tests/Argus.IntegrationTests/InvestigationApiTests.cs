@@ -113,7 +113,7 @@ public sealed class InvestigationApiTests : IDisposable
         using var client = factory.CreateClient();
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ArgusDbContext>();
-        Assert.Equal(5, (await db.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(6, (await db.Database.GetAppliedMigrationsAsync()).Count());
         Assert.Empty(await db.Database.GetPendingMigrationsAsync());
         await Assert.ThrowsAsync<Microsoft.Data.Sqlite.SqliteException>(() => db.Database.ExecuteSqlRawAsync(
             "INSERT INTO Investigations (Id,Title,Description,Status,CreatedAt,UpdatedAt) VALUES ('bad',' ','','Active','2026-01-01','2026-01-01')"));

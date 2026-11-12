@@ -160,3 +160,25 @@ links and citations. No finding or source is hard-deleted by these review APIs.
 GeographicFocus is an investigation-keyed viewport preference (latitude/longitude/zoom)
 with range constraints. Only this view preference cascades when an otherwise empty
 investigation is deleted. It is not an assertion of geographic truth and needs no citation.
+
+## Phase 6 migration: AssessmentsReports
+
+Adds Claims, ClaimEvidence and GeneratedReports without rebuilding earlier tables.
+Claims use GUID identities, restricted investigation links, review/confidence strings,
+optimistic Revision, UTC CreatedAt/UpdatedAt/DeletedAt, analyst reasoning and explicit
+contradiction-resolution fields. CHECK constraints bound statement, status, confidence
+and resolution state; the investigation/status/update index supports review lists.
+
+ClaimEvidence retains GUID identity, claim ID, source ID, immutable snapshot ID, UTF-16
+start/end, SUPPORTS/CONTRADICTS/CONTEXT relationship, analyst note, active flag and UTC
+creation time. Unique claim/snapshot/start/end keys preserve citation identity on relabel
+or reactivation. Restricted snapshot/source composite foreign keys and application scope
+validation prevent foreign-source evidence. Removal retains the record with Active=false.
+Claim/evidence/confidence changes and before/after audit records save atomically.
+
+GeneratedReports retains GUID identity, restricted investigation reference, UTC generation
+time, immutable Markdown, SHA-256 and validation JSON. It is indexed by investigation and
+generation time. Its original contents remain unchanged after finding corrections or
+removal. Report reads/downloads verify the artifact hash. Finding/source approval and
+provenance validation run before insertion in the same transaction. This table is report
+history, not a database/document backup. No Phase 7 schema is introduced.

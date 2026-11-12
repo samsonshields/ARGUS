@@ -1,6 +1,6 @@
 # ARGUS development plan
 
-Current scope: Phases 1-5. Phase 6 has not begun.
+Current scope: Phases 1-6. Phase 7 has not begun.
 
 ## Phase 1 implementation
 
@@ -272,7 +272,7 @@ query, ASP.NET positional-record validation, an upstream OpenAPI nullable-enum d
 serialization issue, circuit-readiness timing and accessible select names. The complete
 final suite passes. No warning suppression or incomplete gate was used.
 
-Phase 5 completion gate passed. Phase 6 remains unauthorized and has not been started.
+Phase 5 completion gate passed. Phase 6 was subsequently authorized and is recorded below.
 
 ## Phase 5 known limits and next steps
 
@@ -288,5 +288,80 @@ Phase 5 completion gate passed. Phase 6 remains unauthorized and has not been st
   restore/history browser workflow. Existing no-authentication/no-OCR/crash-orphan limits remain.
 - One upstream Starlette/httpx test-client deprecation warning persists; runtime/tests pass.
 - Restart API, Web and Python after building to load Phase 5 and apply the additive migration.
-  Await user authorization before Phase 6 assessments/reports.
+  Phase 6 was subsequently authorized; see its implementation and verification below.
+
+
+## Phase 6 implementation
+
+- [x] Read requirements, inspect architecture and verify .NET/Python toolchains.
+- [x] Add claim/evidence/report models, GUIDs, UTC timestamps and additive migration.
+- [x] Add manual confidence, reasoning, support/contradiction/context classifications.
+- [x] Add exact snapshot evidence, source reliability, scope checks and optimistic review.
+- [x] Preserve conflicts, require explicit unresolved acknowledgment and retain audit history.
+- [x] Add claim editor, evidence controls, review filters and assessment summaries.
+- [x] Add approved-only Markdown generation, ten sections, references and limitations.
+- [x] Validate source/snapshot hashes, original files, exact spans and uncertain optional modules.
+- [x] Persist immutable report snapshots and provide safe API/Web attachment downloads.
+- [x] Add domain/API/migration/provenance tests and real CommonMark/browser verification.
+- [x] Correct Unicode quotation reconstruction discovered by the report provenance gate.
+- [x] Update README, architecture, schema and assessment/API contracts.
+- [x] Complete final build/test/format/lint/migration/audit and live regression verification.
+
+## Phase 6 final verification
+
+Verified on 2026-11-11 (America/New_York): .NET SDK 10.0.102, runtime/ASP.NET 10.0.2,
+Python 3.14.6 (including the existing venv), existing spaCy/FastAPI stack and Edge.
+Markdown-it-py 4.3.0 was already installed/pinned and is now an explicit development
+requirement for CommonMark verification. No production dependency or NLP endpoint was added.
+
+- Final sequential `dotnet build Argus.sln -c Release --no-restore`: passed, zero warnings/errors.
+- `dotnet test Argus.sln -c Release --no-build --no-restore`: **154 passed** (79 unit, 75 integration), zero failures/skips.
+- Python pytest: **53 passed**, with the existing single upstream Starlette/httpx deprecation warning.
+- Total automated unit/integration/Python tests: **207 passed**.
+- .NET formatting verification, Ruff lint/format, Python compilation and application JavaScript syntax checks: passed.
+- EF migration consistency: no model drift. Phase 5 upgrade retains existing temporal data; new claim/report tables start empty.
+- NuGet transitive vulnerability audit: no known vulnerable packages reported; `pip check`: no broken requirements.
+- New tests cover confidence/review invariants, unresolved acknowledgment, resolution resets,
+  source grades, cross-investigation rejection, stale revisions, retained evidence/audit history,
+  approved-only export, ten sections, empty optional modules, date/location uncertainty,
+  hashes, missing/tampered originals, immutable snapshots, artifact tampering, export limits,
+  UTF-16 passages after emoji, download bytes and API restart persistence.
+- Phase 1/2 compatibility and real Phase 3 NLP/outage/retry/restart smokes: passed.
+- Phase 4 real Edge graph regression: passed at 100 nodes/300 edges; render 391 ms,
+  initial load 1949 ms on this machine, not a universal performance guarantee.
+- Phase 5 real timeline/map Edge regression: passed, including optional tile failure,
+  offline markers, precision, review, focus and restart persistence.
+- Phase 6 API/Web Edge smoke: passed actual claim creation, three evidence relationships,
+  manual confidence/source grades, unresolved acknowledgment, filters, evidence relabel/removal,
+  report validation, finalized attachment download/hash, immutable snapshot history, correction
+  withdrawal and restart persistence. All non-loopback requests were blocked.
+- CommonMark rendering verification: passed all ten headings, valid P-number anchors,
+  readable literal quotations and escaped HTML/JavaScript-link payloads.
+- Screenshots inspected: `.local/phase6-assessments.png` and `.local/phase6-reports.png`.
+  Verification servers and temporary data were cleaned up; normal instances/default data were not used.
+
+The first provenance run caught an existing SQLite substring/UTF-16 mismatch on non-BMP
+text. Quotation reconstruction now stays in .NET for claims, temporal evidence and report
+entity passages. Regression tests cover exact passages after emoji. A browser test selector
+was also scoped to distinguish the visible evidence label from its select option. Final
+checks pass without suppressing warnings or bypassing report validation.
+
+Phase 6 completion gate passed. Phase 7 has not been started.
+
+## Phase 6 known limits and next steps
+
+- Confidence, source reliability and contradiction resolution are analyst judgments, not
+  independently calculated truth. Reports explicitly retain these distinctions and uncertainty.
+- Markdown attachments and an encoded text preview are implemented; PDF export and editable
+  HTML reports are not. Reference source routes are local ARGUS routes; exported reports also
+  retain IDs, exact quotations, offsets and hashes for provenance outside the running UI.
+- Reports preserve review state at generation time. Later corrections require a new report;
+  earlier snapshots are retained. Claims/evidence use soft removal with audit history and no restore UI.
+- Export bounds are documented in assessment-contracts.md. Generation uses one bounded
+  SQLite transaction; run one API/worker per database. These exports are not complete backups.
+- Browser checks target installed Edge desktop; broader device/browser coverage remains unverified.
+- The upstream Python test-client warning and existing no-authentication/no-OCR/crash-orphan
+  limitations remain. No critical Phase 6 runtime issue is known from the executed checks.
+- Restart API and Web to load the new implementation and apply AssessmentsReports.
+  Await user authorization before any Phase 7 work.
 

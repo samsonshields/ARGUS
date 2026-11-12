@@ -1,0 +1,90 @@
+@page "/investigations/{Id:guid}/assessments"
+@rendermode InteractiveServer
+@using Argus.Web.Components.Shared
+@inject AssessmentApiClient Client
+<PageTitle>ARGUS | Assessments</PageTitle>
+<a href="@($"/investigations/{Id}")">Investigation overview</a> · <a href="@($"/investigations/{Id}/reports")">Reports</a>
+<p class="eyebrow">ASSESSMENTS / ANALYST REVIEW</p><h1>Claims and evidence</h1>
+<p class="muted">Keep source observations separate from analyst interpretation. Approval records your review; it does not mean independent verification. Confidence is a manual assessment, not a probability.</p>
+@if (error is not null) { <p class="error" role="alert">@error</p> }
+@if (message is not null) { <p role="status" class="success">@message</p> }
+@if (summary is not null) { <p>@summary.Proposed proposed · @summary.Approved approved · @summary.Rejected rejected · @summary.UnresolvedContradictions with unresolved contradictions (@summary.ApprovedWithUnresolvedContradictions approved)</p> }
+<fieldset class="filters graph-filters" disabled="@(!interactive || busy)" data-assessment-ready="@interactive.ToString().ToLowerInvariant()">
+    <label>Status<select aria-label="Claim status filter" @bind="status"><option value="">All statuses</option>@foreach (var s in Enum.GetValues<ReviewStatus>()) { <option>@s</option> }</select></label>
+    <label>Confidence<select aria-label="Claim confidence filter" @bind="confidence"><option value="">All confidence levels</option>@foreach (var c in Enum.GetValues<ConfidenceLevel>()) { <option>@c</option> }</select></label>
+    <label>Statement search<input aria-label="Claim statement search" @bind="search" maxlength="200" /></label>
+    <label><input type="checkbox" @bind="unresolved" />Unresolved contradictions only</label><button @onclick="FilterAsync">Apply claim filters</button>
+</fieldset>
+<div class="actions"><button disabled="@(busy || !interactive)" @onclick="New">Create claim</button><button disabled="@busy" @onclick="ReloadAsync">Refresh assessments</button></div>
+@if (items is null) { <p role="status">Loading assessments…</p> }
+else
+{
+    <p>@items.Total claims · page @(page)</p>
+    @if (items.Total == 0) { <p class="panel">No claims match these filters. Create a claim and attach specific source passages.</p> }
+    @foreach (var item in items.Items)
+    { <div class="relationship-row"><button disabled="@busy" @onclick="() => SelectAsync(item.Id)">@item.Statement</button><span>@item.Status · @item.ConfidenceLevel · @item.SupportingCount supporting / @item.ContradictingCount contradicting / @item.ContextCount context</span>@if (item.UnresolvedContradictions) { <strong class="contradiction">Unresolved contradictions</strong> }</div> }
+    <div class="actions"><button disabled="@(busy || page <= 1)" @onclick="() => PageAsync(-1)">Previous claims</button><button disabled="@(busy || page * 20 >= items.Total)" @onclick="() => PageAsync(1)">Next claims</button></div>
+}
+@if (editing)
+{
+    <section class="panel" aria-label="Claim inspector"><h2>@(selected is null ? "New claim" : "Review claim")</h2>
+    <EditForm Model="edit" OnValidSubmit="SaveAsync" FormName="claim-editor"><DataAnnotationsValidator /><ValidationSummary />
+    <fieldset class="editor" disabled="@busy" @onchange="MarkDirty">
+        <label>Claim statement<InputTextArea aria-label="Claim statement" @bind-Value="edit.Statement" maxlength="2000" /></label>
+        <label>Analyst confidence<InputSelect aria-label="Analyst confidence" @bind-Value="edit.ConfidenceLevel">@foreach (var c in Enum.GetValues<ConfidenceLevel>()) { <option>@c</option> }</InputSelect></label>
+        <label>Analyst interpretation and reasoning<InputTextArea aria-label="Analyst interpretation and reasoning" @bind-Value="edit.Reasoning" maxlength="10000" /></label>
+        <label><InputCheckbox @bind-Value="edit.ContradictionsResolved" />Contradictory evidence addressed by analyst</label>
+        <label>Contradiction resolution explanation<InputTextArea aria-label="Contradiction resolution explanation" @bind-Value="edit.ContradictionResolution" maxlength="5000" /></label>
+        <p class="muted">Resolved decisions require an explanation. Adding, removing or relabeling evidence clears the prior resolution and requires renewed review.</p>
+        <button type="submit">Save claim proposal</button><button type="button" @onclick="() => editing = false">Close claim editor</button>
+    </fieldset></EditForm>
+    @if (selected is not null)
+    {
+        <p>Review status: @selected.Claim.Status · revision @selected.Claim.Revision</p>
+        @if (selected.Claim.UnresolvedContradictions) { <p class="contradiction">This claim has unresolved contradictory evidence. It remains visible in finalized reports.</p> }
+        @if (dirty) { <p role="status">Save or reload draft edits before reviewing the claim or changing evidence.</p> }
+        <fieldset class="review-citations" disabled="@(dirty || busy)"><ClaimEvidenceEditor @key="selected.Claim.Id" Claim="selected" Changed="RefreshSelectedAsync" /></fieldset>
+        <label><input type="checkbox" @bind="confirm" />I reviewed the claim, reasoning, confidence and cited evidence.</label>
+        @if (selected.Claim.UnresolvedContradictions) { <label><input type="checkbox" @bind="acknowledge" />I acknowledge the unresolved contradictions; approval does not resolve them.</label> }
+        <div class="actions"><button disabled="@(busy || dirty || !confirm)" @onclick='() => ReviewAsync("approve")'>Approve claim</button><button disabled="@(busy || dirty || !confirm)" @onclick='() => ReviewAsync("reject")'>Reject claim</button><button class="danger" disabled="@(busy || dirty || !confirm)" @onclick='() => ReviewAsync("remove")'>Remove claim</button></div>
+    }
+    </section>
+}
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private PageResult<ClaimSummary>? items;
+    private AssessmentSummary? summary;
+    private ClaimDetail? selected;
+    private ClaimEditRequest edit = new();
+    private string status = "", confidence = "", search = "";
+    private string? error, message;
+    private bool busy, editing, dirty, confirm, acknowledge, interactive, unresolved;
+    private int page = 1;
+    protected override async Task OnParametersSetAsync() => await ReloadAsync();
+    protected override Task OnAfterRenderAsync(bool firstRender) { if (firstRender) { interactive = true; StateHasChanged(); } return Task.CompletedTask; }
+    private void MarkDirty() { dirty = true; confirm = false; acknowledge = false; }
+    private void New() { edit = new(); selected = null; editing = true; dirty = confirm = acknowledge = false; }
+    private async Task LoadAsync() { items = await Client.ClaimsAsync(Id, status, confidence, unresolved, search, page); summary = await Client.SummaryAsync(Id); }
+    private async Task ReloadAsync() => await RunAsync(LoadAsync);
+    private async Task FilterAsync() { page = 1; await ReloadAsync(); }
+    private async Task PageAsync(int delta) { page += delta; await ReloadAsync(); }
+    private async Task SelectAsync(Guid id) => await RunAsync(() => SelectCoreAsync(id));
+    private async Task SelectCoreAsync(Guid id)
+    {
+        selected = await Client.ClaimAsync(id);
+        if (selected.Claim.InvestigationId != Id) { selected = null; throw new HttpRequestException("Claim belongs to another investigation."); }
+        edit = new() { Statement = selected.Claim.Statement, Reasoning = selected.Reasoning, ConfidenceLevel = selected.Claim.ConfidenceLevel,
+            ContradictionsResolved = selected.ContradictionsResolved, ContradictionResolution = selected.ContradictionResolution, Revision = selected.Claim.Revision };
+        editing = true; dirty = confirm = acknowledge = false;
+    }
+    private async Task RefreshSelectedAsync() => await RunAsync(async () => { if (selected is not null) await SelectCoreAsync(selected.Claim.Id); await LoadAsync(); message = "Evidence saved. Review the claim again before approval."; });
+    private async Task SaveAsync() => await RunAsync(async () => { var saved = await Client.SaveAsync(Id, selected?.Claim.Id, edit); await SelectCoreAsync(saved.Claim.Id); await LoadAsync(); message = "Claim saved as proposed."; });
+    private async Task ReviewAsync(string action) => await RunAsync(async () =>
+    {
+        if (action == "remove") { await Client.ActionAsync(selected!.Claim.Id, action, new ReviewTemporalRequest(confirm, selected.Claim.Revision)); selected = null; editing = false; }
+        else { await Client.ActionAsync(selected!.Claim.Id, action, new ClaimReviewRequest(confirm, acknowledge, selected.Claim.Revision)); await SelectCoreAsync(selected.Claim.Id); }
+        await LoadAsync(); message = $"Claim action completed: {action}.";
+    });
+    private async Task RunAsync(Func<Task> action)
+    { busy = true; error = null; message = null; try { await action(); } catch (HttpRequestException ex) { error = ex.Message; } catch (TaskCanceledException) { error = "Request timed out. Reload before retrying."; } finally { busy = false; } }
+}
