@@ -1,0 +1,16 @@
+@inherits LayoutComponentBase
+<div class="workstation">
+    <aside>
+        <a class="brand" href="/">ARGUS<span>ANALYSIS WORKSTATION</span></a>
+        <nav aria-label="Main navigation">
+            <NavLink href="/" Match="NavLinkMatch.All">Dashboard</NavLink>
+            <NavLink href="/investigations">Investigations</NavLink>
+        </nav>
+        <p class="local-note">LOCAL WORKSPACE<br />Single-user research environment</p>
+    </aside>
+    <div class="workspace">
+        <header>Research operations <span class="badge">PHASE 2 / DOCUMENT MANAGEMENT</span></header>
+        <main id="main-content">@Body</main>
+    </div>
+</div>
+<div id="blazor-error-ui" role="alert">Connection interrupted. <a href="" class="reload">Reload</a></div>

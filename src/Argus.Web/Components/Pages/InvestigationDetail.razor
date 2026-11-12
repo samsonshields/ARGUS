@@ -1,0 +1,57 @@
+@page "/investigations/{Id:guid}"
+@rendermode InteractiveServer
+@inject InvestigationClient Client
+@inject NavigationManager Navigation
+<PageTitle>ARGUS | Investigation overview</PageTitle>
+<a href="/investigations">All investigations</a>
+@if (error is not null) { <p role="alert" class="error">@error</p> }
+@if (loading) { <p role="status">Loading investigation...</p> }
+else if (item is not null)
+{
+    @if (Saved) { <p role="status" class="success">Investigation saved.</p> }
+    <p class="eyebrow">INVESTIGATION OVERVIEW / @item.Status</p>
+    <h1>@item.Title</h1>
+    <div class="panel">
+        <p class="description">@(string.IsNullOrEmpty(item.Description) ? "No description provided." : item.Description)</p>
+        <dl><dt>Region</dt><dd>@(item.Region ?? "Unspecified")</dd>
+            <dt>Research scope</dt><dd>@(item.StartDate?.ToString("yyyy-MM-dd") ?? "Unknown") / @(item.EndDate?.ToString("yyyy-MM-dd") ?? "Unknown")</dd>
+            <dt>Created (UTC)</dt><dd>@item.CreatedAt.ToString("u")</dd>
+            <dt>Updated (UTC)</dt><dd>@item.UpdatedAt.ToString("u")</dd>
+        </dl>
+        <a class="button" href="@($"/investigations/{Id}/edit")">Edit details / archive</a>
+        <a class="button" href="@($"/investigations/{Id}/sources")">Source library</a>
+    </div>
+    <section class="panel danger-zone"><h2>Delete investigation</h2>
+    <p class="muted">Investigations with preserved sources cannot be deleted. Archive them to retain their evidence.</p>
+    @if (!confirming) { <button class="danger" @onclick="() => confirming = true">Delete...</button> }
+    else
+    {
+        <p>This permanently removes <strong>@(item.Title)</strong>. This action cannot be undone.</p>
+        <button class="danger" disabled="@deleting" @onclick="DeleteAsync">Confirm permanent deletion</button>
+        <button disabled="@deleting" @onclick="() => confirming = false">Cancel</button>
+    }
+    </section>
+}
+@code {
+    [Parameter] public Guid Id { get; set; }
+    [SupplyParameterFromQuery] public bool Saved { get; set; }
+    private InvestigationResponse? item;
+    private string? error;
+    private bool loading = true, confirming, deleting;
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true; error = null; confirming = false;
+        try { item = await Client.GetAsync(Id); if (item is null) error = "Investigation not found."; }
+        catch (HttpRequestException) { error = "Unable to load investigation. Check the API and reload."; }
+        catch (TaskCanceledException) { error = "The request timed out. Reload to retry."; }
+        finally { loading = false; }
+    }
+    private async Task DeleteAsync()
+    {
+        deleting = true;
+        try { await Client.DeleteAsync(Id); Navigation.NavigateTo("/investigations"); }
+        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (TaskCanceledException) { error = "Deletion timed out. Check the list before retrying."; }
+        finally { deleting = false; }
+    }
+}

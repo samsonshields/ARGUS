@@ -1,0 +1,36 @@
+@page "/investigations"
+@rendermode InteractiveServer
+@inject InvestigationClient Client
+<PageTitle>ARGUS | Investigations</PageTitle>
+<p class="eyebrow">RESEARCH WORKSPACES</p>
+<div class="section-heading"><h1>Investigations</h1><a class="button" href="/investigations/new">New investigation</a></div>
+<form @onsubmit="LoadAsync" @onsubmit:preventDefault class="filters">
+    <label>Search<input @bind="search" maxlength="200" placeholder="Title, description or region" /></label>
+    <label>Status<select @bind="status"><option value="">All statuses</option><option>Active</option><option>Archived</option></select></label>
+    <button disabled="@loading" type="submit">Apply filters</button>
+</form>
+@if (error is not null) { <p role="alert" class="error">@error</p> }
+@if (loading) { <p role="status">Loading investigations...</p> }
+else if (items.Count == 0 && error is null) { <div class="panel">No investigations match this view.</div> }
+else
+{
+    @foreach (var item in items)
+    {
+        <a class="investigation-row" href="@($"/investigations/{item.Id}")"><strong>@item.Title</strong><span>@(item.Region ?? "Region unspecified") / @item.Status</span></a>
+    }
+}
+@code {
+    private List<InvestigationResponse> items = [];
+    private string search = "", status = "";
+    private bool loading;
+    private string? error;
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        loading = true; error = null;
+        try { items = await Client.ListAsync(search, status); }
+        catch (HttpRequestException) { error = "Unable to load investigations. Check the API and retry."; }
+        catch (TaskCanceledException) { error = "The request timed out. Please retry."; }
+        finally { loading = false; }
+    }
+}

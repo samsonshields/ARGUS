@@ -1,0 +1,79 @@
+@page "/sources/{Id:guid}"
+@rendermode InteractiveServer
+@inject SourceClient Sources
+<PageTitle>ARGUS | Source viewer</PageTitle>
+@if (error is not null) { <p class="error" role="alert">@error</p> }
+@if (loading) { <p role="status">Loading source...</p> }
+else if (item is not null)
+{
+    <a href="@($"/investigations/{item.Source.InvestigationId}/sources")">Back to investigation sources</a>
+    <p class="eyebrow">SOURCE VIEWER / @item.Source.SourceType / @item.Source.ProcessingStatus</p>
+    <h1>@item.Source.Title</h1>
+    @if (Imported) { <p role="status" class="success">Original source saved.</p> }
+    @if (success is not null) { <p role="status" class="success">@success</p> }
+    @if (item.Source.ProcessingError is not null) { <p role="alert" class="error">@item.Source.ProcessingError</p> }
+    <section class="panel">
+        <dl><dt>Original filename</dt><dd>@item.Source.OriginalFileName</dd>
+            <dt>Size</dt><dd>@item.Source.FileSize bytes</dd>
+            <dt>Retrieved (UTC)</dt><dd>@item.Source.RetrievedAt.ToString("u")</dd>
+            <dt>SHA-256</dt><dd><code>@item.ContentHash</code></dd>
+            <dt>Extraction</dt><dd>@(item.ExtractedAt?.ToString("u") ?? "No successful extraction") / @item.ExtractionVersion</dd></dl>
+        <a class="button" href="@($"/downloads/sources/{Id}")" data-enhance-nav="false">Download original</a>
+        <button disabled="@busy" @onclick="ReextractAsync">@(busy ? "Working..." : "Retry text extraction")</button>
+        <p class="muted">Text extraction does not verify claims. No NLP or OCR is run.</p>
+    </section>
+    <section class="panel"><h2>Extracted text</h2>
+        @if (item.ExtractedAt.HasValue && item.Source.ProcessingStatus == SourceProcessingStatus.Failed)
+        { <p class="error">The latest retry failed. The text below is from the last successful extraction.</p> }
+        <pre class="source-text">@(string.IsNullOrEmpty(item.ExtractedText) ? "No extracted text is available." : item.ExtractedText)</pre>
+    </section>
+    <h2>Source metadata</h2>
+    <EditForm Model="metadata" OnValidSubmit="SaveAsync" FormName="source-metadata" class="panel editor">
+        <DataAnnotationsValidator /><ValidationSummary />
+        <SourceMetadataFields Model="metadata" />
+        <button type="submit" disabled="@busy">Save metadata</button>
+    </EditForm>
+}
+@code {
+    [Parameter] public Guid Id { get; set; }
+    [SupplyParameterFromQuery] public bool Imported { get; set; }
+    private SourceResponse? item;
+    private SourceMetadataRequest metadata = new();
+    private string? error, success;
+    private bool loading = true, busy;
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true; item = null; error = null;
+        try { SetItem(await Sources.GetAsync(Id)); }
+        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (TaskCanceledException) { error = "Source loading timed out. Reload to retry."; }
+        finally { loading = false; }
+    }
+    private void SetItem(SourceResponse response)
+    {
+        item = response;
+        metadata = new() { Title = item.Source.Title, Publisher = item.Source.Publisher, PublishedAt = item.Source.PublishedAt,
+            OriginalUrl = item.OriginalUrl, Reliability = item.Source.Reliability };
+    }
+    private async Task SaveAsync()
+    {
+        busy = true; error = success = null;
+        try { SetItem(await Sources.UpdateAsync(Id, metadata)); success = "Source metadata saved."; }
+        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (TaskCanceledException) { error = "Save timed out. Reload to check before retrying."; }
+        finally { busy = false; }
+    }
+    private async Task ReextractAsync()
+    {
+        busy = true; error = success = null;
+        try
+        {
+            // Preserve unsaved metadata while refreshing extraction state.
+            item = await Sources.ExtractAsync(Id);
+            if (item.Source.ProcessingStatus == SourceProcessingStatus.Ready) success = "Text extraction completed.";
+        }
+        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (TaskCanceledException) { error = "Extraction timed out. Reload to check its status."; }
+        finally { busy = false; }
+    }
+}

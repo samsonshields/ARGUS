@@ -1,0 +1,37 @@
+@page "/"
+@inject InvestigationClient Client
+@inject SourceClient Sources
+<PageTitle>ARGUS | Dashboard</PageTitle>
+<p class="eyebrow">WORKSPACE OVERVIEW</p>
+<h1>Investigation dashboard</h1>
+<p class="muted">Organize research scope and maintain persistent investigation workspaces.</p>
+@if (error is not null) { <p role="alert" class="error">@error</p><a href="/">Retry</a> }
+else if (items is null) { <p role="status">Loading dashboard...</p> }
+else
+{
+    <div class="metrics">
+        <section><span>Total investigations</span><strong>@items.Count</strong></section>
+        <section><span>Active workspaces</span><strong>@items.Count(x => x.Status == InvestigationStatus.Active)</strong></section>
+        <section><span>Archived investigations</span><strong>@items.Count(x => x.Status == InvestigationStatus.Archived)</strong></section>
+        <section><span>Imported sources</span><strong>@statistics?.Total</strong></section>
+        <section><span>Text extraction complete</span><strong>@statistics?.Ready</strong></section>
+        <section><span>Extraction failures</span><strong>@statistics?.Failed</strong></section>
+    </div>
+    <div class="section-heading"><h2>Recently updated</h2><a class="button" href="/investigations/new">New investigation</a></div>
+    @if (items.Count == 0) { <div class="panel"><h3>Your workspace is ready</h3><p>Create an investigation to define its research scope.</p></div> }
+    @foreach (var item in items.Take(5))
+    {
+        <a class="investigation-row" href="@($"/investigations/{item.Id}")"><strong>@item.Title</strong><span>@item.Status / @item.UpdatedAt.ToString("yyyy-MM-dd HH:mm") UTC</span></a>
+    }
+}
+@code {
+    private List<InvestigationResponse>? items;
+    private string? error;
+    private SourceStatistics? statistics;
+    protected override async Task OnInitializedAsync()
+    {
+        try { items = await Client.ListAsync(); statistics = await Sources.StatisticsAsync(); }
+        catch (HttpRequestException) { error = "Cannot reach the API. Check that it is running, then retry."; }
+        catch (TaskCanceledException) { error = "The API request timed out. Please retry."; }
+    }
+}

@@ -1,0 +1,17 @@
+@Argus.Api_HostAddress = http://localhost:5100
+
+GET {{Argus.Api_HostAddress}}/api/v1/investigations
+Accept: application/json
+
+###
+
+GET {{Argus.Api_HostAddress}}/health
+Accept: application/json
+
+###
+GET {{Argus.Api_HostAddress}}/api/v1/import-settings
+Accept: application/json
+
+###
+GET {{Argus.Api_HostAddress}}/api/v1/source-statistics
+Accept: application/json

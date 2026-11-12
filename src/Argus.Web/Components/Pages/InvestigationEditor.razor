@@ -1,0 +1,54 @@
+@page "/investigations/new"
+@page "/investigations/{Id:guid}/edit"
+@rendermode InteractiveServer
+@inject InvestigationClient Client
+@inject NavigationManager Navigation
+<PageTitle>ARGUS | Investigation editor</PageTitle>
+<a href="@(Id.HasValue ? $"/investigations/{Id}" : "/investigations")">Back to workspace</a>
+<h1>@(Id.HasValue ? "Edit investigation" : "New investigation")</h1>
+@if (error is not null) { <p role="alert" class="error">@error</p> }
+@if (loading) { <p role="status">Loading investigation...</p> }
+else if (ready)
+{
+    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="investigation" class="panel editor">
+        <DataAnnotationsValidator /><ValidationSummary />
+        <label for="title">Title</label><InputText id="title" @bind-Value="model.Title" maxlength="200" /><ValidationMessage For="() => model.Title" />
+        <label for="description">Description</label><InputTextArea id="description" @bind-Value="model.Description" maxlength="5000" />
+        <label for="region">Region (optional)</label><InputText id="region" @bind-Value="model.Region" maxlength="200" />
+        <label for="status">Status</label><InputSelect id="status" @bind-Value="model.Status"><option value="Active">Active</option><option value="Archived">Archived</option></InputSelect>
+        <label for="start">Scope start date (optional)</label><InputDate id="start" @bind-Value="model.StartDate" />
+        <label for="end">Scope end date (optional)</label><InputDate id="end" @bind-Value="model.EndDate" /><ValidationMessage For="() => model.EndDate" />
+        <button disabled="@saving" type="submit">@(saving ? "Saving..." : "Save investigation")</button>
+    </EditForm>
+}
+@code {
+    [Parameter] public Guid? Id { get; set; }
+    private InvestigationRequest model = new();
+    private string? error;
+    private bool loading = true, saving, ready;
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true; ready = false; error = null; model = new();
+        try
+        {
+            if (Id.HasValue)
+            {
+                var item = await Client.GetAsync(Id.Value);
+                if (item is null) { error = "Investigation not found."; return; }
+                model = new() { Title = item.Title, Description = item.Description, Status = item.Status, Region = item.Region, StartDate = item.StartDate, EndDate = item.EndDate };
+            }
+            ready = true;
+        }
+        catch (HttpRequestException) { error = "Unable to load investigation. Check the API and reload."; }
+        catch (TaskCanceledException) { error = "The request timed out. Reload to retry."; }
+        finally { loading = false; }
+    }
+    private async Task SaveAsync()
+    {
+        saving = true; error = null;
+        try { var item = await Client.SaveAsync(Id, model); Navigation.NavigateTo($"/investigations/{item.Id}?saved=true"); }
+        catch (HttpRequestException ex) { error = $"Could not save. {ex.Message}"; }
+        catch (TaskCanceledException) { error = "Save timed out. Check the investigation list before retrying."; }
+        finally { saving = false; }
+    }
+}

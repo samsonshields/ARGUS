@@ -1,0 +1,17 @@
+<label for="source-title">Title</label><InputText id="source-title" @bind-Value="Model.Title" maxlength="200" />
+<ValidationMessage For="() => Model.Title" />
+<label for="publisher">Publisher (optional)</label><InputText id="publisher" @bind-Value="Model.Publisher" maxlength="200" />
+<label for="original-url">Original URL (attribution only, optional)</label><InputText id="original-url" @bind-Value="Model.OriginalUrl" maxlength="2048" />
+<label for="published">Publication date (optional)</label><InputDate id="published" @bind-Value="Model.PublishedAt" />
+<label for="reliability">Source reliability (manual assessment)</label>
+<InputSelect id="reliability" @bind-Value="Model.Reliability">
+    <option value="E">E - Insufficient information</option>
+    <option value="A">A - Generally reliable</option>
+    <option value="B">B - Usually reliable</option>
+    <option value="C">C - Mixed or uncertain reliability</option>
+    <option value="D">D - Frequently unreliable</option>
+</InputSelect>
+<p class="muted">Reliability describes the source. It does not verify any individual claim.</p>
+@code {
+    [Parameter, EditorRequired] public SourceMetadataRequest Model { get; set; } = default!;
+}

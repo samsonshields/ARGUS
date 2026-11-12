@@ -1,0 +1,117 @@
+@page "/investigations/{Id:guid}/sources"
+@rendermode InteractiveServer
+@inject SourceClient Sources
+@inject InvestigationClient Investigations
+@inject NavigationManager Navigation
+<PageTitle>ARGUS | Source library</PageTitle>
+<a href="@($"/investigations/{Id}")">Investigation overview</a>
+<p class="eyebrow">@investigation?.Title / SOURCE LIBRARY</p>
+<h1>Sources</h1>
+@if (error is not null) { <p role="alert" class="error">@error</p> }
+@if (duplicateId.HasValue) { <a href="@($"/sources/{duplicateId}")">Open existing source</a> }
+@if (loading) { <p role="status">Loading sources...</p> }
+else if (investigation is not null && limits is not null)
+{
+    <section class="panel">
+        <h2>Import a source</h2>
+        <p class="muted">Text and extractable PDF files, up to @(limits.MaxFileBytes / 1024) KiB. Scanned PDFs need OCR, which is not supported.</p>
+        <label for="input-kind">Input method</label>
+        <select id="input-kind" @bind="inputKind" disabled="@importing"><option value="file">Upload file</option><option value="paste">Paste text</option></select>
+        <EditForm Model="metadata" OnValidSubmit="ImportAsync" FormName="source-import" class="editor">
+            <DataAnnotationsValidator /><ValidationSummary />
+            <SourceMetadataFields Model="metadata" />
+            @if (inputKind == "file")
+            {
+                <label for="source-file">Document (.txt or .pdf)</label><InputFile id="source-file" OnChange="SelectFile" accept=".txt,.pdf" disabled="@importing" />
+                @if (file is not null) { <p>@file.Name (@file.Size bytes)</p> }
+            }
+            else
+            {
+                <label for="paste">Source text</label><InputTextArea id="paste" @bind-Value="pastedText" maxlength="2000000" />
+            }
+            <button disabled="@importing" type="submit">@(importing ? "Importing and extracting text..." : "Import source")</button>
+        </EditForm>
+    </section>
+    <h2>Source library (@items.Count)</h2>
+    <form @onsubmit="LoadListAsync" @onsubmit:preventDefault class="filters">
+        <label>Search title or text<input @bind="search" maxlength="200" /></label>
+        <label>Published from<input type="date" @bind="from" /></label>
+        <label>Published through<input type="date" @bind="to" /></label>
+        <button type="submit" disabled="@searching">Search</button>
+    </form>
+    @if (searching) { <p role="status">Searching...</p> }
+    else if (items.Count == 0) { <p class="panel">No sources match this view. Import a document or change the filters.</p> }
+    @foreach (var item in items)
+    {
+        <a class="investigation-row" href="@($"/sources/{item.Id}")"><strong>@item.Title</strong>
+            <span>@item.SourceType / @item.ProcessingStatus / Reliability @item.Reliability / @(item.PublishedAt?.ToString("yyyy-MM-dd") ?? "Publication date unknown")</span></a>
+        @if (item.ProcessingError is not null) { <p class="error">@item.ProcessingError</p> }
+    }
+}
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private InvestigationResponse? investigation;
+    private ImportSettings? limits;
+    private List<SourceSummary> items = [];
+    private SourceMetadataRequest metadata = new();
+    private IBrowserFile? file;
+    private string inputKind = "file", pastedText = "", search = "";
+    private DateOnly? from, to;
+    private string? error;
+    private Guid? duplicateId;
+    private bool loading = true, importing, searching;
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true; error = null; file = null; metadata = new();
+        try
+        {
+            investigation = await Investigations.GetAsync(Id);
+            if (investigation is null) { error = "Investigation not found."; return; }
+            limits = await Sources.SettingsAsync();
+            items = await Sources.ListAsync(Id);
+        }
+        catch (HttpRequestException) { error = "Unable to load the source library. Check the API and reload."; }
+        catch (TaskCanceledException) { error = "The request timed out. Reload to retry."; }
+        finally { loading = false; }
+    }
+    private void SelectFile(InputFileChangeEventArgs e)
+    {
+        file = e.File;
+        if (string.IsNullOrWhiteSpace(metadata.Title)) metadata.Title = System.IO.Path.GetFileNameWithoutExtension(file.Name);
+    }
+    private async Task LoadListAsync()
+    {
+        searching = true; error = null;
+        try { items = await Sources.ListAsync(Id, search, from, to); }
+        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (TaskCanceledException) { error = "Search timed out. Retry."; }
+        finally { searching = false; }
+    }
+    private async Task ImportAsync()
+    {
+        importing = true; error = null; duplicateId = null;
+        try
+        {
+            SourceResponse result;
+            if (inputKind == "file")
+            {
+                if (file is null) { error = "Choose a document first."; return; }
+                if (file.Size > limits!.MaxFileBytes) { error = "The document exceeds the configured size limit."; return; }
+                await using var stream = file.OpenReadStream(limits!.MaxFileBytes);
+                result = await Sources.UploadAsync(Id, metadata, file.Name, stream);
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(pastedText)) { error = "Paste nonempty source text first."; return; }
+                result = await Sources.PasteAsync(Id, new() { Title = metadata.Title, Publisher = metadata.Publisher,
+                    OriginalUrl = metadata.OriginalUrl, PublishedAt = metadata.PublishedAt, Reliability = metadata.Reliability, Text = pastedText });
+            }
+            Navigation.NavigateTo($"/sources/{result.Source.Id}?imported=true");
+        }
+        catch (SourceHttpException ex) { error = ex.Message; duplicateId = ex.ExistingSourceId; }
+        catch (HttpRequestException) { error = "Import failed. Check the API and retry."; }
+        catch (IOException) { error = "Unable to read the selected file. Select it again and retry."; }
+        catch (TaskCanceledException) { error = "Import timed out. Check the library before retrying."; }
+        finally { importing = false; }
+    }
+}

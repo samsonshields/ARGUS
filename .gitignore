@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+.vs/
+.venv/
+__pycache__/
+.env
+data/
+*.db
+*.db-shm
+*.db-wal
+*.log
+TestResults/
+.local/
