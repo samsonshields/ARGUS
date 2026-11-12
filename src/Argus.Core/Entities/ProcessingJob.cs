@@ -18,8 +18,9 @@ public sealed class ProcessingJob
     public Guid? SnapshotId { get; private set; }
     public int CandidateCount { get; private set; }
     public int Revision { get; private set; }
+    public JobKind Kind { get; private set; } = JobKind.ENTITIES;
     private ProcessingJob() { }
-    public ProcessingJob(Source source) { SourceId = source.Id; InvestigationId = source.InvestigationId; }
+    public ProcessingJob(Source source, JobKind kind = JobKind.ENTITIES) { SourceId = source.Id; InvestigationId = source.InvestigationId; Kind = kind; }
     private void Changed() { UpdatedAt = DateTime.UtcNow; Revision++; }
     public void Start()
     {
@@ -51,5 +52,5 @@ public sealed class ProcessingJob
         State = JobState.CANCELLED; NextAttemptAt = null; ErrorCode = "cancelled"; Error = "Cancelled by the analyst."; Changed();
     }
     public JobResponse ToResponse() => new(Id, SourceId, InvestigationId, State, Attempts, ErrorCode,
-        Error, CreatedAt, UpdatedAt, NextAttemptAt, SnapshotId, CandidateCount);
+        Error, CreatedAt, UpdatedAt, NextAttemptAt, SnapshotId, CandidateCount, Kind);
 }

@@ -143,7 +143,7 @@ def test_health_and_openapi_are_available(client):
     assert client.get("/health").json()["status"] == "ready"
     paths = client.get("/openapi.json").json()["paths"]
     assert "/process/entities" in paths
-    assert "/process/relationships" not in paths
+    assert "/process/relationships" in paths
     assert "/process/events" not in paths
 
 

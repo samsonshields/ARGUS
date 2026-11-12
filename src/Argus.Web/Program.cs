@@ -22,6 +22,11 @@ builder.Services.AddHttpClient<IntelligenceApiClient>((services, client) =>
     client.BaseAddress = new Uri(services.GetRequiredService<IOptions<ApiOptions>>().Value.BaseUrl);
     client.Timeout = TimeSpan.FromSeconds(40);
 });
+builder.Services.AddHttpClient<GraphApiClient>((services, client) =>
+{
+    client.BaseAddress = new Uri(services.GetRequiredService<IOptions<ApiOptions>>().Value.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(40);
+});
 var app = builder.Build();
 app.UseExceptionHandler("/Error", createScopeForErrors: true);
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);

@@ -1,4 +1,4 @@
-# Database schema (Phases 1–3)
+# Database schema (Phases 1–4)
 
 File: API data directory / argus.db. Committed migrations and snapshot are under
 src/Argus.Infrastructure/Data/Migrations. Initial migration creates Investigations:
@@ -97,3 +97,38 @@ SourceState Ready indicates text extraction, not NLP approval or job success. NL
 readiness/failures are represented in ProcessingJobs. Full text snapshots intentionally
 consume additional local storage to retain exact evidence across extraction upgrades.
 There are no relationship or graph tables in this migration.
+
+## Phase 4 migration: EntityGraph
+
+Adds ProcessingJobs.Kind, default ENTITIES for existing job history, and adds
+Relationships and RelationshipEvidence. No graph database or Phase 5 tables are introduced.
+Existing entity/source/evidence tables retain their records and constraints.
+
+Relationships stores GUID Id/InvestigationId/SourceEntityId/TargetEntityId, current Type,
+review Status, optional CustomLabel, Notes, immutable Origin, optional RetiredReason,
+UTC CreatedAt and optimistic Revision. Endpoint composite foreign keys reference
+Entities(Id,InvestigationId) with RESTRICT, preventing cross-investigation links.
+Indexes cover investigation/status and both endpoints. CHECK constraints bound types/
+statuses and disallow self-links unless explicitly retired by an entity merge.
+
+RelationshipEvidence stores GUID Id/RelationshipId/SourceId/SnapshotId/original source
+and target mention IDs; UTF-16 Start/End; stable unique OriginKey; Method; review Status.
+Foreign keys RESTRICT deletion of referenced relationships, sources, mentions and
+snapshots; snapshot/source composite keys enforce source consistency. Span/status
+CHECK constraints prevent negative/empty/oversized citations or unknown review states.
+Quotes are reconstructed from immutable snapshots, never mutable current extracted text.
+
+Generation atomically adds proposals/passages and completes a persistent source job.
+The active-job unique index still allows only one job of either kind per source.
+Relationship generation never changes source extraction status; cancellation/retry
+preserve the job kind. Existing ENTITIES jobs migrate with their original meaning.
+
+OriginKey hashes snapshot ID + sorted original mention IDs + sentence offsets + method.
+Identical reruns do not duplicate citations or reset decisions. New evidence added to
+a reviewed co-mention remains proposed until individually reviewed. Approval/rejection,
+classification and merge redirection write audit events in the same transaction.
+
+Entity merges redirect relationship endpoints atomically with mention moves and alias
+updates. Self-links are retired, not deleted; parallel relationships stay distinct.
+No approval or evidence history is silently collapsed. Graph queries exclude retired
+and rejected records; detail endpoints retain history/citations for investigation review.

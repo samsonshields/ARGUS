@@ -19,7 +19,9 @@ else
         <section><span>Extraction failures</span><strong>@statistics?.Failed</strong></section>
         <section><span>Mentions awaiting review</span><strong>@intelligence?.Proposed</strong></section>
         <section><span>Approved entities</span><strong>@intelligence?.ApprovedEntities</strong></section>
-        <section><span>Active / failed NLP jobs</span><strong>@intelligence?.PendingJobs / @intelligence?.FailedJobs</strong></section>
+        <section><span>Active / failed processing jobs</span><strong>@intelligence?.PendingJobs / @intelligence?.FailedJobs</strong></section>
+        <section><span>Proposed relationships</span><strong>@intelligence?.ProposedRelationships</strong></section>
+        <section><span>Reviewed relationships</span><strong>@intelligence?.ApprovedRelationships</strong></section>
     </div>
     <div class="section-heading"><h2>Recently updated</h2><a class="button" href="/investigations/new">New investigation</a></div>
     @if (items.Count == 0) { <div class="panel"><h3>Your workspace is ready</h3><p>Create an investigation to define its research scope.</p></div> }

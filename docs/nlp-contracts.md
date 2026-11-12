@@ -2,8 +2,9 @@
 
 The independent Python service never opens or writes SQLite or source files. It
 receives exact extracted text over loopback HTTP and returns candidates only.
-Only Phase 3 endpoints exist: GET `/health` and POST `/process/entities`.
-FastAPI serves `/openapi.json` and `/docs`; relationships/events are not implemented.
+Phase 3 endpoints are GET `/health` and POST `/process/entities`.
+Phase 4 adds POST `/process/relationships` as described in [graph contracts](graph-contracts.md).
+FastAPI serves `/openapi.json` and `/docs`; event processing is not implemented.
 
 Request: `contractVersion` = "1", `sourceId` = GUID string, `textHash` = lowercase
 SHA-256 of UTF-8 exact text, and `text` = the unchanged extracted string. Unknown

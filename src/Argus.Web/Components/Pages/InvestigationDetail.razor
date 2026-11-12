@@ -21,6 +21,8 @@ else if (item is not null)
         <a class="button" href="@($"/investigations/{Id}/edit")">Edit details / archive</a>
         <a class="button" href="@($"/investigations/{Id}/sources")">Source library</a>
         <a class="button" href="@($"/investigations/{Id}/entities")">Entities and review</a>
+        <a class="button" href="@($"/investigations/{Id}/relationships")">Relationship review</a>
+        <a class="button" href="@($"/investigations/{Id}/graph")">Relationship graph</a>
     </div>
     <section class="panel danger-zone"><h2>Delete investigation</h2>
     <p class="muted">Investigations with preserved sources cannot be deleted. Archive them to retain their evidence.</p>

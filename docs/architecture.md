@@ -1,4 +1,4 @@
-# Architecture through Phase 3
+# Architecture through Phase 4
 
 The repository root is the proposed argus monorepo root. The supplied specification
 is project_specifications.md; the requested hyphenated filename is absent. There was
@@ -26,8 +26,9 @@ built-in forms/custom CSS avoid an unnecessary shell dependency; MudBlazor remai
 
 Python 3.14.6 meets the specified minimum. Phase 3 uses verified FastAPI/spaCy wheels
 and a trained local English model; the smoke scripts themselves use the standard library.
-No authentication, public deployment hardening, pagination or concurrent edit conflict
-handling is included. Last saved edit wins. Loopback defaults support local use.
+Authentication/public deployment hardening is absent. Legacy investigation/source
+lists remain unpaginated and their edits use last-write-wins; intelligence review and
+jobs use pagination and optimistic concurrency. Loopback defaults support local use.
 
 ## Phase 2: source management
 
@@ -109,5 +110,43 @@ Pydantic 2.14.3 and Uvicorn 0.54.0. Pinning Microsoft.OpenApi to patched 2.7.5 a
 the vulnerable 2.0.0 transitive dependency of ASP.NET OpenAPI 10.0.2. Dependency/model
 installation needs internet; runtime processing uses existing local assets offline.
 
-No co-occurrence, relationship extraction, graph models/algorithms, Cytoscape, timelines
-or maps are implemented. Phase 4 remains untouched. See nlp-contracts.md for wire details.
+Phase 3 did not add graph features. Phase 4 implementation is described below.
+See nlp-contracts.md for entity wire details.
+
+## Phase 4: relationship review and graph exploration
+
+Relationship generation is a second persistent job kind. The .NET worker sends approved
+mention/canonical IDs and immutable snapshot text to the independent Python sentence
+pipeline. It validates returned IDs, hashes, offsets and quoted passages, stages all
+results and commits proposals/evidence/job completion atomically. Stable evidence keys
+preserve reviews under reruns; bounded retries and cancellation reuse existing job rules.
+This pipeline deliberately cannot assert membership, location or participation.
+
+Analysts select evidence passages and explicitly approve/reject proposals. Co-mentions
+remain low-assertion even after review. Substantive classifications need a stated reason;
+their direction is explicit. Newly attached passages remain proposed independently of
+an already reviewed edge. Entity and relationship revision tokens prevent stale merges/
+generation/review from overwriting concurrent decisions. Entity merges retain citations,
+retire self-links, and preserve parallel edge history rather than silently consolidating it.
+
+Read-only GraphService projects active canonical entities and proposed/reviewed edges
+with citations. GraphAlgorithms in Core implements normalized degree, connected
+components, unweighted shortest paths and Brandes betweenness. Metrics use a simple
+undirected projection; paths optionally honor directed types. This small deterministic
+.NET implementation avoids a runtime Python round trip for graph exploration and needs
+no additional NetworkX dependency. It satisfies the implement-or-integrate algorithm
+requirement while keeping Python responsible for stateless candidate processing.
+
+GraphApiClient centralizes HTTP in Web. Cytoscape.js 3.33.4 is vendored with its license,
+verified npm tarball integrity and JavaScript hash. Blazor interop serializes enum names
+explicitly and manages per-component graph disposal. Graph layout/selection/filtering
+are view operations only. DOM selectors provide keyboard alternatives to canvas nodes/
+edges; highlighted paths and selected-edge citations remain linked to investigation context.
+No CDN or remote assets are needed. The graph response/algorithm size caps are explicit;
+larger graphs require filters rather than silent truncation.
+
+API/domain/real-Python tests cover proposed evidence, review, retries, merge retirement,
+exact snapshot provenance and graph invariants. The real-process Edge smoke builds its
+100-node/300-edge fixture through ordinary API imports/approvals, not direct Python DB
+writes, and verifies browser interaction/performance while blocking non-loopback assets.
+Phase 5 timeline, geographic/event processing and map functionality remain absent.

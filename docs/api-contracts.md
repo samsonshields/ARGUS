@@ -1,4 +1,4 @@
-# API contracts (Phases 1–3)
+# API contracts (Phases 1–4)
 
 Base: http://localhost:5100/api/v1. JSON uses camelCase, string statuses Active/Archived,
 GUID IDs, ISO UTC timestamps and YYYY-MM-DD scope dates.
@@ -177,5 +177,8 @@ text reuses mentions by snapshot/span/type and keeps prior review decisions. Cha
 text adds a new snapshot and candidates; older evidence remains available.
 
 .NET publishes `/openapi/v1.json`. See [Python JSON contract](nlp-contracts.md) for
-readiness, hashing, label mapping and UTF-16 span rules. Phase 4 graph/relationship
-APIs and Python relationship/event processing endpoints remain absent.
+readiness, hashing, label mapping and UTF-16 span rules. Phase 4 adds the
+[relationship/graph contracts](graph-contracts.md), a RELATIONSHIPS job kind and
+proposedRelationships/approvedRelationships statistics. Job retry retains its kind;
+relationship jobs do not re-extract or alter source text state. Event/timeline/map
+endpoints remain absent.

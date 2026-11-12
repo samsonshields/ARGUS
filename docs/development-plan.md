@@ -1,6 +1,6 @@
 # ARGUS development plan
 
-Current scope: Phases 1–3. Phase 4 has not begun.
+Current scope: Phases 1–4. Phase 5 has not begun.
 
 ## Phase 1 implementation
 
@@ -156,5 +156,64 @@ instances/default local databases are not used by the verification workflow.
 - Python tests emit one upstream Starlette/httpx deprecation warning; it does not affect passing tests/runtime.
 - Existing local security, no-OCR and potential crash-orphan limitations remain.
 
-Next: await user authorization for Phase 4. No relationships, co-occurrence pipeline,
-graph tables/algorithms, Cytoscape integration, timeline/event or map features were started.
+Phase 4 was subsequently authorized and implemented below; Phase 5 remains untouched.
+
+## Phase 4 implementation
+
+- [x] Inspect specification, architecture and verified .NET/Python toolchains.
+- [x] Add relationship/evidence domain models, validation, audit and EntityGraph migration.
+- [x] Add deterministic same-sentence Python co-mention generation over approved mentions.
+- [x] Extend persistent worker with RELATIONSHIPS jobs, retry/cancel/recovery and atomic result persistence.
+- [x] Preserve exact snapshot citations, stable rerun deduplication and independent passage review status.
+- [x] Add explicit analyst relationship approval/rejection and substantive reasoning requirements.
+- [x] Keep merge history/citations; retire self-links and preserve parallel relationships.
+- [x] Implement bounded graph APIs, structural metrics, filtered shortest paths and incident-edge APIs.
+- [x] Vendor verified Cytoscape 3.33.4 and license for offline graph rendering.
+- [x] Implement graph pan/zoom, selection, filters, neighbor expansion, path highlighting and citations.
+- [x] Add accessible HTML selectors and distinct proposed/co-mention/substantive edge styles.
+- [x] Add domain/API/Python and 100-node/300-edge performance tests.
+- [x] Run real headless Edge interactions and inspect captured screenshot.
+- [x] Update README, architecture, schema, JSON/API contracts and environment requirements.
+- [x] Record final build/test/lint/migration/audit/browser-smoke results.
+
+## Phase 4 final verification
+
+Toolchains unchanged: SDK 10.0.102/runtime 10.0.2; Python 3.14.6 and installed spaCy stack.
+Verified Cytoscape 3.33.4 npm integrity and preserved MIT license; Playwright 1.65.1
+uses installed Microsoft Edge without downloading a browser.
+Completed on 2026-11-11 (America/New_York):
+
+- Final sequential `dotnet build Argus.sln -c Release --no-restore`: passed, zero warnings/errors.
+- `dotnet test Argus.sln -c Release --no-build --no-restore`: **101 passed** (47 unit, 54 integration), zero failures/skips.
+- Python pytest: **38 passed**; one existing upstream Starlette/httpx test-client deprecation warning.
+- .NET formatting verification, Ruff lint/format and Python/JavaScript syntax checks: passed.
+- EF migration consistency: no model drift. Phase 3 job history upgraded with ENTITIES as the default kind.
+- NuGet transitive vulnerability audit: no known vulnerable packages reported; `pip check`: no broken requirements.
+- Earlier-phase API/Web and real NLP smoke scripts: passed, including restart persistence.
+- Real headless Edge graph smoke: passed **100 nodes / 300 edges**; latest render **207 ms**,
+  initial load **952 ms** on this development machine (not a universal performance guarantee).
+- Browser coverage: actual canvas-node click, keyboard selectors, pan/zoom, filters,
+  neighbor expansion, shortest path, quoted citations, co-mention/substantive evidence
+  approval, blocked non-loopback assets, XSS-safe labels, deduplicated reruns and restart persistence.
+- Unit graph metric benchmark also passed its 3-second 100-node/300-edge budget.
+- Captured graph screenshot inspected: `.local/phase4-graph-100-300.png`; reviewed view:
+  `.local/phase4-graph.png`. Temporary servers and test data were cleaned up.
+- Independent new-passage review is covered: additional citations on a reviewed co-mention
+  remain proposed until explicitly approved; existing reviews are never silently promoted/reset.
+
+A final build initially overlapped with an owned smoke server and hit a Windows Web DLL
+lock; after the smoke servers stopped, the sequential rebuild passed without warnings.
+Normal application instances/default databases were not used for tests. Phase 4 automated
+completion gate passed; restart API, Web and Python to load the new implementation.
+
+## Phase 4 limits
+
+- Metrics describe structure, not truth, importance, intent or threat.
+- English statistical NER and sentence splitting can be imperfect; all candidates need review.
+- Graphs are capped at 2000 nodes/10000 edges; larger responses require filtering.
+- One worker/API per SQLite database; generation and HTTP limits are explicit in graph-contracts.md.
+- Browser verification targets Edge desktop graph workflows, not every browser/device or earlier upload workflow.
+- Existing no-authentication/no-OCR/crash-orphan constraints and one upstream Python test-client warning remain.
+
+Next: await authorization for Phase 5. No timelines, event/date-resolution pipelines,
+geographic locations, maps, Leaflet integration or Phase 5 APIs were started.

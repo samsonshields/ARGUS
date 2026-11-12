@@ -27,3 +27,5 @@ Accept: application/json
 ###
 GET {{Argus.Api_HostAddress}}/openapi/v1.json
 Accept: application/json
+
+### Relationship/graph routes and review payloads are documented in docs/graph-contracts.md.

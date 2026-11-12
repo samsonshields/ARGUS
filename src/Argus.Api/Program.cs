@@ -40,6 +40,14 @@ builder.Services.AddHttpClient<IIntelligenceClient, IntelligenceClient>((service
 builder.Services.AddScoped<ProcessingJobService>();
 builder.Services.AddScoped<ProcessingRunner>();
 builder.Services.AddScoped<EntityReviewService>();
+builder.Services.AddScoped<RelationshipService>();
+builder.Services.AddScoped<GraphService>();
+builder.Services.AddHttpClient<IRelationshipClient, IntelligenceClient>((services, client) =>
+{
+    var options = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<IntelligenceOptions>>().Value;
+    client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+});
 builder.Services.AddHostedService<IntelligenceWorker>();
 builder.Services.AddOptions<DocumentOptions>().Bind(builder.Configuration.GetSection("Documents"))
     .Validate(x => x.MaxFileBytes is > 0 and <= 100 * 1024 * 1024 && x.MaxExtractedCharacters is > 0 and <= 2_000_000

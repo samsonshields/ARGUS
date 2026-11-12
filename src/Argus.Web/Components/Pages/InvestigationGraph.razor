@@ -1,0 +1,149 @@
+@page "/investigations/{Id:guid}/graph"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@inject GraphApiClient Client
+@inject IJSRuntime JS
+<PageTitle>ARGUS | Relationship graph</PageTitle>
+<a href="@($"/investigations/{Id}")">Investigation overview</a> / <a href="@($"/investigations/{Id}/relationships")">Relationship review</a>
+<h1>Relationship graph</h1>
+<p class="muted">Graph structure describes recorded connections, not importance, intent or threat. Co-mentions do not substantiate another relationship.</p>
+@if (error is not null) { <p role="alert" class="error">@error</p> }
+<form @onsubmit="LoadAsync" @onsubmit:preventDefault class="filters graph-filters">
+    <label>Entity type<select aria-label="Entity type" @bind="entityType"><option value="">All entity types</option>@foreach (var type in Enum.GetValues<EntityType>()) { <option>@type</option> }</select></label>
+    <label>Relationship type<select aria-label="Relationship type" @bind="relationshipType"><option value="">All relationship types</option>@foreach (var type in Enum.GetValues<RelationshipType>()) { <option>@type</option> }</select></label>
+    <label>Filter names<input @bind="search" maxlength="200" placeholder="Optional graph subset" /></label>
+    <label><input type="checkbox" @bind="includeProposed" /> Include proposed edges</label>
+    <button type="submit" disabled="@busy">Apply graph filters</button>
+</form>
+@if (graph is null) { <p role="status">Loading graph...</p> }
+else
+{
+    <p role="status" id="graph-summary">@graph.Nodes.Count nodes / @graph.Edges.Count edges / @graph.ComponentCount connected components</p>
+    <div class="graph-legend"><span class="proposed-key">Dashed amber: proposed</span><span class="co-key">Dotted gray: reviewed co-mention</span><span class="approved-key">Solid cyan: analyst-reviewed substantive relationship</span></div>
+    <div class="actions">
+        <button disabled="@(!ready)" @onclick='() => ActionAsync("zoomIn")'>Zoom in</button>
+        <button disabled="@(!ready)" @onclick='() => ActionAsync("zoomOut")'>Zoom out</button>
+        <button disabled="@(!ready)" @onclick='() => ActionAsync("fit")'>Show full graph</button>
+        <button disabled="@(!ready || selectedNode is null)" @onclick='() => ActionAsync("focus")'>Focus selected node</button>
+        <button disabled="@(!ready || selectedNode is null)" @onclick='() => ActionAsync("expand")'>Expand neighbors</button>
+    </div>
+    <div @ref="canvas" class="graph-canvas" role="img" aria-label="Interactive relationship graph. Use the node and edge selectors below for keyboard access."></div>
+    @if (graph.Nodes.Count == 0) { <p class="panel">No approved entities match these filters. Approve source mentions to add nodes.</p> }
+    else if (graph.Edges.Count == 0) { <p class="panel">There are no visible relationships. Generate and review co-mention candidates, or change filters.</p> }
+    <div class="filters">
+        <label>Find and select node<select aria-label="Find and select node" @bind="nodeChoice" @bind:after="SelectNodeAsync"><option value="">Choose a node</option>
+            @foreach (var node in graph.Nodes.OrderBy(x => x.Label)) { <option value="@node.Id">@node.Label / @node.Type</option> }</select></label>
+        <label>Select edge for citations<select aria-label="Select edge for citations" @bind="edgeChoice" @bind:after="SelectEdgeAsync"><option value="">Choose an edge</option>
+            @foreach (var edge in graph.Edges) { <option value="@edge.Id">@EdgeLabel(edge)</option> }</select></label>
+    </div>
+    @if (selectedNode is not null)
+    {
+        <section class="panel"><h2>Selected node: @selectedNode.Label</h2>
+            <p>@selectedNode.Type / @selectedNode.ConnectionCount incident edges / @selectedNode.Degree unique neighbors / component @selectedNode.Component</p>
+            <p>Degree centrality @selectedNode.DegreeCentrality.ToString("F3") / normalized betweenness @selectedNode.Betweenness.ToString("F3")</p>
+            <a href="@($"/entities/{selectedNode.Id}")">Entity and source mentions</a></section>
+    }
+    <section class="panel"><h2>Shortest connection path</h2>
+        <div class="filters"><label>Path start<select aria-label="Path start" @bind="pathStart"><option value="">Choose start</option>@foreach (var node in graph.Nodes) { <option value="@node.Id">@node.Label</option> }</select></label>
+            <label>Path end<select aria-label="Path end" @bind="pathEnd"><option value="">Choose end</option>@foreach (var node in graph.Nodes) { <option value="@node.Id">@node.Label</option> }</select></label></div>
+        <label><input type="checkbox" @bind="respectDirection" /> Respect direction for substantive directed edges</label>
+        <button disabled="@(busy || !pathStart.HasValue || !pathEnd.HasValue)" @onclick="FindPathAsync">Highlight shortest path</button>
+        @if (pathMessage is not null) { <p role="status">@pathMessage</p> }
+        <p class="muted">Paths and metrics use current filters. A path is a structural connection, not evidence of wrongdoing.</p>
+    </section>
+    <RelationshipInspector Id="selectedEdge" Reviewed="ReloadAfterReviewAsync" />
+}
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private GraphResponse? graph;
+    private Dictionary<Guid, GraphNode> nodes = [];
+    private string entityType = "", relationshipType = "", search = "", nodeChoice = "", edgeChoice = "";
+    private string appliedEntityType = "", appliedRelationshipType = "", appliedSearch = "";
+    private bool includeProposed = true, appliedProposed = true, respectDirection, busy, ready, repaint;
+    private string? error, pathMessage;
+    private GraphNode? selectedNode;
+    private Guid? selectedEdge, pathStart, pathEnd;
+    private ElementReference canvas;
+    private IJSObjectReference? module;
+    private DotNetObjectReference<InvestigationGraph>? receiver;
+    protected override Task OnParametersSetAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        busy = true; error = null; ready = false; pathMessage = null;
+        try
+        {
+            graph = await Client.GraphAsync(Id, entityType, relationshipType, includeProposed, search);
+            nodes = graph.Nodes.ToDictionary(x => x.Id);
+            appliedEntityType = entityType; appliedRelationshipType = relationshipType; appliedProposed = includeProposed; appliedSearch = search;
+            selectedNode = null; selectedEdge = null; nodeChoice = edgeChoice = ""; pathStart = pathEnd = null; repaint = true;
+        }
+        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (TaskCanceledException) { error = "Graph request timed out. Narrow the filters and retry."; }
+        finally { busy = false; }
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!repaint || graph is null) return;
+        repaint = false;
+        try
+        {
+            module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./graph.js");
+            receiver ??= DotNetObjectReference.Create(this);
+            await module.InvokeVoidAsync("mount", canvas, System.Text.Json.JsonSerializer.SerializeToElement(graph, InvestigationClient.Json), receiver);
+            ready = true;
+        }
+        catch (JSException) { error = "The local graph renderer could not load. Reload the page; relationship evidence remains available in review."; }
+        StateHasChanged();
+    }
+    [JSInvokable]
+    public Task NodeSelected(string id)
+    {
+        if (Guid.TryParse(id, out var parsed) && nodes.TryGetValue(parsed, out var node)) { selectedNode = node; selectedEdge = null; nodeChoice = id; edgeChoice = ""; StateHasChanged(); }
+        return Task.CompletedTask;
+    }
+    [JSInvokable]
+    public Task EdgeSelected(string id)
+    {
+        if (Guid.TryParse(id, out var parsed) && graph!.Edges.Any(x => x.Id == parsed)) { selectedEdge = parsed; selectedNode = null; edgeChoice = id; nodeChoice = ""; StateHasChanged(); }
+        return Task.CompletedTask;
+    }
+    private async Task SelectNodeAsync()
+    {
+        if (nodeChoice == "") { selectedNode = null; await ActionAsync("clear"); return; }
+        await NodeSelected(nodeChoice); if (ready && module is not null) await module.InvokeVoidAsync("select", canvas, nodeChoice);
+    }
+    private async Task SelectEdgeAsync()
+    {
+        if (edgeChoice == "") { selectedEdge = null; await ActionAsync("clear"); return; }
+        await EdgeSelected(edgeChoice); if (ready && module is not null) await module.InvokeVoidAsync("select", canvas, edgeChoice);
+    }
+    private async Task ActionAsync(string command) { if (module is not null) await module.InvokeVoidAsync("action", canvas, command, selectedNode?.Id.ToString()); }
+    private string EdgeLabel(GraphEdge edge) => $"{nodes[edge.Source].Label} / {nodes[edge.Target].Label} / {edge.Label} / {edge.Status}";
+    private async Task FindPathAsync()
+    {
+        busy = true; error = null;
+        try
+        {
+            var result = await Client.PathAsync(Id, pathStart!.Value, pathEnd!.Value, appliedEntityType, appliedRelationshipType, appliedProposed, respectDirection, appliedSearch);
+            pathMessage = result.Found ? $"Path found: {result.EdgeIds.Count} connections." : "No path exists within the current filters.";
+            if (module is not null) await module.InvokeVoidAsync("highlightPath", canvas, result);
+        }
+        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (TaskCanceledException) { error = "Path search timed out."; }
+        finally { busy = false; }
+    }
+    private async Task ReloadAfterReviewAsync()
+    {
+        // Refresh visible graph while keeping the selected relationship's evidence open.
+        var prior = selectedEdge; await LoadAsync(); selectedEdge = prior;
+    }
+    public async ValueTask DisposeAsync()
+    {
+        if (module is not null)
+        {
+            try { await module.InvokeVoidAsync("destroy", canvas); await module.DisposeAsync(); }
+            catch (JSDisconnectedException) { }
+        }
+        receiver?.Dispose();
+    }
+}

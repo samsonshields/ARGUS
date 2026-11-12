@@ -1,0 +1,52 @@
+@page "/investigations/{Id:guid}/relationships"
+@rendermode InteractiveServer
+@inject GraphApiClient Client
+<PageTitle>ARGUS | Relationship review</PageTitle>
+<a href="@($"/investigations/{Id}")">Investigation overview</a> / <a href="@($"/investigations/{Id}/graph")">Relationship graph</a>
+<h1>Relationship review</h1>
+<p class="muted">Approve entity mentions first, then generate sentence co-mention proposals. No relationship is automatically approved.</p>
+@if (error is not null) { <p role="alert" class="error">@error</p> }
+@if (message is not null) { <p role="status">@message</p> }
+<div class="actions"><button disabled="@busy" @onclick="GenerateAsync">Generate co-mention candidates</button><a href="/processing-jobs">Monitor background jobs</a></div>
+<div class="filters"><label>Review status<select @bind="status"><option value="">All statuses</option><option>PROPOSED</option><option>APPROVED</option><option>REJECTED</option></select></label>
+    <label>Relationship type<select @bind="type"><option value="">All types</option>@foreach (var item in Enum.GetValues<RelationshipType>()) { <option>@item</option> }</select></label>
+    <button disabled="@busy" @onclick="RefreshAsync">Refresh relationships</button></div>
+@if (items is null) { <p role="status">Loading relationships...</p> }
+else
+{
+    @if (items.Total == 0) { <p class="panel">No relationships match this view. Proposals require two different approved entities in one sentence.</p> }
+    @foreach (var relationship in items.Items)
+    {
+        <div class="relationship-row"><button disabled="@busy" @onclick="() => selected = relationship.Id">@relationship.SourceName / @relationship.TargetName</button>
+            <span>@relationship.Type / @relationship.Status / @relationship.ApprovedEvidenceCount reviewed passages / @relationship.ProposedEvidenceCount pending</span></div>
+    }
+    <div class="actions"><button disabled="@(busy || page == 1)" @onclick="() => PageAsync(-1)">Previous relationships</button><span>Page @(page) / @items.Total relationships</span>
+        <button disabled="@(busy || page * items.PageSize >= items.Total)" @onclick="() => PageAsync(1)">Next relationships</button></div>
+}
+<RelationshipInspector Id="selected" Reviewed="LoadAsync" />
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private PageResult<RelationshipSummary>? items;
+    private string status = "", type = "";
+    private string? error, message;
+    private int page = 1;
+    private bool busy;
+    private Guid? selected;
+    protected override Task OnParametersSetAsync() { selected = null; page = 1; return LoadAsync(); }
+    private async Task LoadAsync()
+    {
+        try { items = await Client.ListAsync(Id, status, type, page); }
+        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (TaskCanceledException) { error = "Relationship loading timed out."; }
+    }
+    private async Task RefreshAsync() { page = 1; error = null; await LoadAsync(); }
+    private async Task PageAsync(int delta) { page += delta; await LoadAsync(); }
+    private async Task GenerateAsync()
+    {
+        busy = true; error = null;
+        try { var result = await Client.GenerateAsync(Id); message = $"Queued {result.Jobs.Count} source jobs; {result.BusySources} sources already busy. Monitor jobs, then refresh this list."; }
+        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (TaskCanceledException) { error = "Queue request timed out. Check jobs before retrying."; }
+        finally { busy = false; }
+    }
+}
