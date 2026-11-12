@@ -327,9 +327,7 @@ def main() -> None:
                 request(route + f"/relationships/{first_edge['id']}")
             )
             assert preserved["evidence"][0]["quote"] == proof["evidence"][0]["quote"]
-            expect_error(
-                lambda: request(route + f"/investigations/{inv}/timeline"), 404
-            )
+            expect_error(lambda: request(route + f"/investigations/{inv}/claims"), 404)
             print(
                 f"PASS: real 100-node/300-edge graph; Edge render {render_ms}ms, initial load {load_ms}ms; pan/zoom, filters, neighbors, path, evidence review, offline assets, XSS-safe labels, stable reprocessing and restart persistence. Screenshot: .local/phase4-graph.png"
             )

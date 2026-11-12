@@ -1,0 +1,51 @@
+@inject TemporalApiClient Client
+@inject SourceClient Sources
+<h3>Source evidence</h3>
+@if (error is not null) { <p class="error" role="alert">@error</p> }
+@foreach (var citation in Evidence)
+{
+    <figure class="citation"><blockquote>@citation.Quote</blockquote>
+        <figcaption><a href="@($"/sources/{citation.SourceId}")">@citation.SourceTitle</a> · preserved snapshot · UTF-16 @citation.Start–@citation.End
+            <details><summary>Snapshot hash</summary><code>@citation.TextHash</code></details>
+        </figcaption>
+        <button disabled="@busy" @onclick="() => RemoveAsync(citation.Id)">Remove citation</button>
+    </figure>
+}
+@if (Evidence.Count == 0) { <p class="muted">Add a source passage before approval.</p> }
+<details><summary>Add a source passage</summary>
+    <label>Source <select aria-label="Citation source" @bind="sourceId" @bind:after="LoadAsync"><option value="">Choose source</option>
+        @foreach (var source in sources) { <option value="@source.Id">@source.Title</option> }
+    </select></label>
+    @if (passages is not null)
+    {
+        @foreach (var passage in passages.Items)
+        { <div class="citation"><pre class="passage">@passage.Quote</pre><button disabled="@busy" @onclick="() => AddAsync(passage)">Cite passage @passage.Start–@passage.End</button></div> }
+        <button disabled="@(page <= 1 || busy)" @onclick="() => ChangePageAsync(-1)">Previous passages</button>
+        <button disabled="@(page * 10 >= passages.Total || busy)" @onclick="() => ChangePageAsync(1)">Next passages</button>
+    }
+</details>
+@code {
+    [Parameter] public Guid InvestigationId { get; set; }
+    [Parameter] public Guid RecordId { get; set; }
+    [Parameter] public bool Location { get; set; }
+    [Parameter] public int Revision { get; set; }
+    [Parameter] public List<CitationResponse> Evidence { get; set; } = [];
+    [Parameter] public EventCallback Changed { get; set; }
+    private List<SourceSummary> sources = [];
+    private Guid? sourceId;
+    private PageResult<PassageResponse>? passages;
+    private int page = 1;
+    private bool busy;
+    private string? error;
+    protected override async Task OnInitializedAsync()
+    { try { sources = await Sources.ListAsync(InvestigationId); } catch (HttpRequestException ex) { error = ex.Message; } }
+    private async Task LoadAsync() { page = 1; await FetchAsync(); }
+    private async Task ChangePageAsync(int delta) { page += delta; await FetchAsync(); }
+    private async Task FetchAsync() => await RunAsync(async () => passages = sourceId.HasValue ? await Client.PassagesAsync(sourceId.Value, page) : null);
+    private async Task AddAsync(PassageResponse passage) => await RunAsync(async () =>
+    { await Client.ActionAsync(RecordId, Location, "evidence", new CitationRequest(passage.SnapshotId, passage.Start, passage.End, Revision)); await Changed.InvokeAsync(); });
+    private async Task RemoveAsync(Guid id) => await RunAsync(async () =>
+    { await Client.RemoveCitationAsync(RecordId, Location, id, Revision); await Changed.InvokeAsync(); });
+    private async Task RunAsync(Func<Task> action)
+    { busy = true; error = null; try { await action(); } catch (HttpRequestException ex) { error = ex.Message; } catch (TaskCanceledException) { error = "Request timed out. Reload before retrying."; } finally { busy = false; } }
+}

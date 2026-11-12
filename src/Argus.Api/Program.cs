@@ -42,6 +42,13 @@ builder.Services.AddScoped<ProcessingRunner>();
 builder.Services.AddScoped<EntityReviewService>();
 builder.Services.AddScoped<RelationshipService>();
 builder.Services.AddScoped<GraphService>();
+builder.Services.AddScoped<TemporalService>();
+builder.Services.AddHttpClient<IEventClient, IntelligenceClient>((services, client) =>
+{
+    var options = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<IntelligenceOptions>>().Value;
+    client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+});
 builder.Services.AddHttpClient<IRelationshipClient, IntelligenceClient>((services, client) =>
 {
     var options = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<IntelligenceOptions>>().Value;

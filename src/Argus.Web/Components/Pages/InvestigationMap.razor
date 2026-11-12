@@ -1,0 +1,169 @@
+@page "/investigations/{Id:guid}/map"
+@rendermode InteractiveServer
+@implements IAsyncDisposable
+@using System.Text.Json
+@using Argus.Core.Services
+@using Argus.Web.Components.Shared
+@inject TemporalApiClient Client
+@inject IntelligenceApiClient Intelligence
+@inject IJSRuntime JS
+<PageTitle>ARGUS | Geography</PageTitle>
+<a href="@($"/investigations/{Id}")">Investigation overview</a> · <a href="@($"/investigations/{Id}/timeline")">Timeline</a>
+<p class="eyebrow">GEOGRAPHY / REVIEWED LOCATIONS</p><h1>Investigation geography</h1>
+<p class="muted">Only approved locations with selected or verified coordinates appear. Amber circles show an approximate location's uncertainty radius. Purple rings mark events.</p>
+@if (error is not null) { <p role="alert" class="error">@error</p> }
+@if (message is not null) { <p role="status" class="success">@message</p> }
+<div class="filters graph-filters">
+    <label>Event type<select aria-label="Map event type" @bind="type"><option value="">All types</option>@foreach (var t in Enum.GetValues<EventType>()) { <option>@t</option> }</select></label>
+    <label>From<input aria-label="Map from" type="date" value="@from" @onchange="e => from = e.Value?.ToString() ?? string.Empty" /></label>
+    <label>Through<input aria-label="Map through" type="date" value="@to" @onchange="e => to = e.Value?.ToString() ?? string.Empty" /></label>
+    <label><input type="checkbox" @bind="unknown" />Include events with unknown dates</label><button disabled="@busy" @onclick="ReloadAsync">Apply map filters</button>
+</div>
+<p class="muted">Date and event type filters apply to event rings. Approved location entities remain visible.</p>
+<div class="actions"><button disabled="@busy" @onclick="New">Create location profile</button><button disabled="@busy" @onclick="ReloadAsync">Refresh geography</button>
+    <button disabled="@(busy || module is null)" @onclick="SaveFocusAsync">Save current geographic focus</button>
+    <button disabled="@(module is null)" @onclick="ToggleTilesAsync">@(online ? "Use offline coordinate grid" : "Load OpenStreetMap basemap (online)")</button></div>
+<p class="muted">The coordinate grid works offline. Loading the optional online basemap sends viewport tile requests to OpenStreetMap. Attribution and browser caching are retained; no tile downloads or geocoding are performed.</p>
+@if (tileError) { <p role="status">Online tiles are unavailable. The coordinate grid and reviewed markers remain usable.</p> }
+<div class="map-canvas" @ref="canvas" role="region" aria-label="Investigation map" tabindex="0"></div>
+@if (data is null) { <p role="status">Loading geography…</p> }
+else
+{
+    <p>@data.Locations.Count approved mapped locations · @data.Events.Count event markers</p>
+    @if (data.Locations.Count == 0) { <p class="panel">No approved locations have known coordinates. Create and cite a location profile, then approve it.</p> }
+    <label>Choose a mapped record (keyboard accessible)<select aria-label="Choose mapped record" value="@recordChoice" @onchange="ChooseAsync"><option value="">Choose location or event</option>
+        @foreach (var l in data.Locations) { <option value="@($"location:{l.Id}")">Location: @l.Name (@l.Precision)</option> }
+        @foreach (var e in data.Events) { <option value="@($"event:{e.Id}")">Event: @e.Title · @TemporalDisplay.Date(e)</option> }
+    </select></label>
+}
+<section class="panel"><h2>Location review library</h2>
+    @if (locations.Count == 0) { <p>No location profiles yet. Approve a LOCATION entity first in entity review.</p> }
+    @foreach (var l in locations)
+    { <div class="relationship-row"><button disabled="@busy" @onclick="() => SelectLocationAsync(l.Id)">@l.Name</button><span>@l.Status · @l.Precision · @l.Evidence.Count citations</span><a href="@($"/entities/{l.EntityId}")">Entity record</a></div> }
+</section>
+@if (selectedEvent is not null)
+{
+    <section class="panel"><h2>@selectedEvent.Title</h2><p>@TemporalDisplay.Date(selectedEvent) · @selectedEvent.Type</p><p>@selectedEvent.Description</p>
+    <p>The marker uses its associated location's precision and uncertainty.</p>
+    @foreach (var e in selectedEvent.Evidence) { <figure class="citation"><blockquote>@e.Quote</blockquote><figcaption><a href="@($"/sources/{e.SourceId}")">@e.SourceTitle</a> · snapshot @e.TextHash</figcaption></figure> }
+    <a class="button" href="@($"/investigations/{Id}/timeline?eventId={selectedEvent.Id}")">Open event and review on timeline</a></section>
+}
+@if (editing)
+{
+    <section class="panel" aria-label="Location inspector"><h2>@(selected is null ? "New location profile" : selected.Name)</h2>
+    <p>Click the map to copy a coordinate into this draft, or enter source-verified coordinates. Review the precision and confirm before saving.</p>
+    @if (selected is null)
+    {
+        <label>Find approved location entities<input aria-label="Find location entities" @bind="entitySearch" /></label><button disabled="@busy" @onclick="SearchAsync">Find location entities</button>
+        <label>Location entity<select aria-label="Location entity" @bind="edit.EntityId"><option value="@Guid.Empty">Choose approved LOCATION entity</option>@foreach (var e in entityChoices) { <option value="@e.Id">@e.Name</option> }</select></label>
+        <p class="muted">Search matches include LOCATION entities only. Narrow your search if needed.</p>
+    }
+    else { <a href="@($"/entities/{selected.EntityId}")">Open approved entity record</a> }
+    <EditForm Model="edit" OnValidSubmit="SaveAsync" FormName="location-editor"><DataAnnotationsValidator /><ValidationSummary />
+        <fieldset disabled="@busy" class="editor" @onchange="MarkDirty">
+        <label>Location precision<InputSelect aria-label="Location precision" @bind-Value="edit.Precision">@foreach (var p in Enum.GetValues<GeoPrecision>()) { <option>@p</option> }</InputSelect></label>
+        <label>Latitude<InputNumber @bind-Value="edit.Latitude" /></label><label>Longitude<InputNumber @bind-Value="edit.Longitude" /></label>
+        <label>Approximate uncertainty radius (metres)<InputNumber @bind-Value="edit.UncertaintyMeters" /></label>
+        <label>Coordinate basis<InputSelect aria-label="Coordinate basis" @bind-Value="edit.Basis">@foreach (var b in Enum.GetValues<CoordinateBasis>()) { <option>@b</option> }</InputSelect></label>
+        <label>Basis and uncertainty notes<InputTextArea @bind-Value="edit.Notes" /></label>
+        <label><InputCheckbox @bind-Value="edit.ConfirmCoordinates" />I explicitly selected these coordinates or verified them against the cited source metadata.</label>
+        <p class="muted">UNKNOWN requires empty coordinates and radius. APPROXIMATE requires a radius greater than zero. EXACT asserts a precise selected or verified point.</p>
+        <button type="submit">Save location proposal</button><button type="button" @onclick="() => editing = false">Close location editor</button></fieldset>
+    </EditForm>
+    @if (selected is not null)
+    {
+        <p>Current review: @selected.Status · @selected.Precision · @selected.Basis</p>
+        @if (dirty) { <p role="status">Save or reload your draft edits before reviewing this location or changing its citations.</p> }
+        <fieldset class="review-citations" disabled="@dirty"><TemporalCitations @key="selected.Id" InvestigationId="Id" RecordId="selected.Id" Location="true" Revision="selected.Revision" Evidence="selected.Evidence" Changed="RefreshSelectedAsync" /></fieldset>
+        <label><input type="checkbox" @bind="confirm" />I reviewed the location, uncertainty and citations; confirm the selected action.</label>
+        <div class="actions"><button disabled="@(busy || dirty || !confirm)" @onclick='() => ReviewAsync("approve")'>Approve location</button><button disabled="@(busy || dirty || !confirm)" @onclick='() => ReviewAsync("reject")'>Reject location</button><button class="danger" disabled="@(busy || dirty || !confirm)" @onclick='() => ReviewAsync("remove")'>Remove location</button></div>
+    }
+    </section>
+}
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private MapResponse? data;
+    private List<LocationResponse> locations = [];
+    private List<EntityResponse> entityChoices = [];
+    private LocationResponse? selected;
+    private EventResponse? selectedEvent;
+    private LocationEditRequest edit = new();
+    private ElementReference canvas;
+    private IJSObjectReference? module;
+    private DotNetObjectReference<InvestigationMap>? reference;
+    private string type = "", from = "", to = "", entitySearch = "", recordChoice = "";
+    private string? error, message;
+    private bool unknown = true, busy, editing, confirm, online, tileError, render, dirty;
+    private void MarkDirty() { dirty = true; confirm = false; }
+    protected override async Task OnParametersSetAsync() => await ReloadAsync();
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!render || data is null) return;
+        render = false;
+        try
+        {
+            var initializing = module is null;
+            module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./js/geography.js");
+            reference ??= DotNetObjectReference.Create(this);
+            await module.InvokeVoidAsync("render", canvas, JsonSerializer.SerializeToElement(data, InvestigationClient.Json), reference, Id);
+            if (initializing) StateHasChanged();
+        }
+        catch (JSException) { error = "The map could not load. The location library and citations remain available."; StateHasChanged(); }
+    }
+    private async Task LoadAsync()
+    {
+        data = await Client.MapAsync(Id, type, from, to, unknown); locations = await Client.LocationsAsync(Id);
+        if (selectedEvent is not null) selectedEvent = data.Events.SingleOrDefault(x => x.Id == selectedEvent.Id);
+        render = true;
+    }
+    private async Task ReloadAsync() => await RunAsync(LoadAsync);
+    private void New() { selected = null; selectedEvent = null; edit = new(); editing = true; confirm = false; dirty = false; }
+    private async Task SelectLocationAsync(Guid id) => await RunAsync(() => SelectCoreAsync(id));
+    private async Task SelectCoreAsync(Guid id)
+    {
+        selected = await Client.LocationAsync(id);
+        if (selected.InvestigationId != Id) { selected = null; throw new HttpRequestException("Location belongs to another investigation."); }
+        selectedEvent = null; editing = true; confirm = false; dirty = false;
+        edit = new() { EntityId = selected.EntityId, Precision = selected.Precision, Latitude = selected.Latitude, Longitude = selected.Longitude,
+            UncertaintyMeters = selected.UncertaintyMeters, Basis = selected.Basis, Notes = selected.Notes, Revision = selected.Revision };
+    }
+    private async Task RefreshSelectedAsync() { if (selected is not null) { await SelectLocationAsync(selected.Id); await ReloadAsync(); } }
+    private async Task SaveAsync() => await RunAsync(async () => { var result = await Client.SaveLocationAsync(Id, selected?.Id, edit); await SelectCoreAsync(result.Id); await LoadAsync(); message = "Location saved as proposed. Review citations before approval."; });
+    private async Task ReviewAsync(string action) => await RunAsync(async () =>
+    { await Client.ActionAsync(selected!.Id, true, action, new ReviewTemporalRequest(confirm, selected.Revision)); if (action == "remove") { selected = null; editing = false; } else await SelectCoreAsync(selected.Id); await LoadAsync(); message = $"Location action completed: {action}."; });
+    private async Task SearchAsync() => await RunAsync(async () =>
+    { entityChoices = (await Intelligence.EntitiesAsync(Id, entitySearch)).Items.Where(x => x.Type == EntityType.LOCATION).ToList(); });
+    private async Task ChooseAsync(ChangeEventArgs e)
+    { recordChoice = e.Value?.ToString() ?? ""; var parts = recordChoice.Split(':'); if (parts.Length == 2 && Guid.TryParse(parts[1], out var id)) await SelectRecord(parts[0], id); }
+    [JSInvokable] public async Task SelectRecord(string kind, Guid id)
+    {
+        recordChoice = $"{kind}:{id}";
+        await RunAsync(async () =>
+        {
+            if (kind == "location")
+            { await SelectCoreAsync(id); if (module is not null && selected!.Latitude.HasValue) await module.InvokeVoidAsync("locate", canvas, selected.Latitude.Value, selected.Longitude); }
+            else
+            {
+                selectedEvent = data?.Events.SingleOrDefault(x => x.Id == id); editing = false;
+                var location = data?.Locations.SingleOrDefault(x => x.Id == selectedEvent?.LocationId);
+                if (module is not null && location is not null) await module.InvokeVoidAsync("locate", canvas, location.Latitude, location.Longitude);
+            }
+        });
+        await InvokeAsync(StateHasChanged);
+    }
+    [JSInvokable] public Task PickCoordinates(double latitude, double longitude)
+    {
+        if (editing && !busy) { MarkDirty(); edit.Latitude = Math.Round(latitude, 6); edit.Longitude = Math.Round(longitude, 6); edit.Basis = CoordinateBasis.EXPLICIT_SELECTION; edit.ConfirmCoordinates = false; message = "Coordinates copied into draft. Choose precision and confirm before saving."; }
+        return InvokeAsync(StateHasChanged);
+    }
+    [JSInvokable] public Task TileError() { tileError = true; return InvokeAsync(StateHasChanged); }
+    private async Task ToggleTilesAsync() { if (module is null) return; online = !online; tileError = false; await module.InvokeVoidAsync("basemap", canvas, online); }
+    private async Task SaveFocusAsync() => await RunAsync(async () => { if (module is null) return; var focus = await module.InvokeAsync<MapFocusRequest>("focus", canvas); await Client.FocusAsync(Id, focus); message = "Geographic focus saved."; });
+    private async Task RunAsync(Func<Task> action)
+    { busy = true; error = null; message = null; try { await action(); } catch (HttpRequestException ex) { error = ex.Message; } catch (TaskCanceledException) { error = "Request timed out. Refresh before retrying."; } catch (JSException) { error = "Map interaction failed. Refresh to retry."; } finally { busy = false; } }
+    public async ValueTask DisposeAsync()
+    {
+        if (module is not null) { try { await module.InvokeVoidAsync("dispose", canvas); await module.DisposeAsync(); } catch (JSDisconnectedException) { } }
+        reference?.Dispose();
+    }
+}

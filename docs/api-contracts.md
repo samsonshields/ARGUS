@@ -180,5 +180,11 @@ text adds a new snapshot and candidates; older evidence remains available.
 readiness, hashing, label mapping and UTF-16 span rules. Phase 4 adds the
 [relationship/graph contracts](graph-contracts.md), a RELATIONSHIPS job kind and
 proposedRelationships/approvedRelationships statistics. Job retry retains its kind;
-relationship jobs do not re-extract or alter source text state. Event/timeline/map
-endpoints remain absent.
+relationship jobs do not re-extract or alter source text state. Phase 5 additions
+are documented below.
+
+## Phase 5 additions
+
+See [temporal and geographic contracts](temporal-contracts.md) for event generation,
+timeline/review/citations, location profiles, map filters and geographic focus APIs.
+All earlier APIs remain compatible. No Phase 6 claims or reports are exposed.

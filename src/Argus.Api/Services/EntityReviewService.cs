@@ -116,6 +116,8 @@ public sealed class EntityReviewService(ArgusDbContext db, IOptions<Intelligence
         var entity = await FindEntityAsync(id, ct);
         if (entity.MergedIntoId.HasValue) throw new SourceException(409, "This entity has been merged. Edit its target entity.");
         var before = JsonSerializer.Serialize(entity.ToResponse(0));
+        if (request.Type != EntityType.LOCATION && await db.Locations.AnyAsync(x => x.EntityId == id && x.DeletedAt == null, ct))
+            throw new SourceException(409, "Retire the active location profile before changing its entity type.");
         entity.Update(request);
         Audit(entity.InvestigationId, "Entity", entity.Id, "Corrected", entity.ToResponse(0), before);
         await db.SaveChangesAsync(ct);
@@ -126,11 +128,28 @@ public sealed class EntityReviewService(ArgusDbContext db, IOptions<Intelligence
         if (!request.Confirm || request.SourceId == request.TargetId) throw new SourceException(400, "Confirm a merge of two different entities.");
         var source = await FindEntityAsync(request.SourceId, ct);
         var target = await FindEntityAsync(request.TargetId, ct);
+        var sourceLocation = await db.Locations.SingleOrDefaultAsync(x => x.EntityId == source.Id && x.DeletedAt == null, ct);
+        if (sourceLocation is not null && await db.Locations.AnyAsync(x => x.EntityId == target.Id && x.DeletedAt == null, ct))
+            throw new SourceException(409, "Both entities have location profiles. Review and retire one profile before merging.");
         var before = JsonSerializer.Serialize(new { Source = source.ToResponse(0), Target = target.ToResponse(0) });
         try { source.MergeInto(target); }
         catch (InvalidOperationException) { throw new SourceException(409, "Merge requires active entities of the same investigation and type. Correct classifications first if needed."); }
         var mentions = await db.EntityMentions.Where(x => x.EntityId == source.Id).ToListAsync(ct);
         foreach (var mention in mentions) mention.MoveTo(target);
+        if (sourceLocation is not null)
+        {
+            sourceLocation.Redirect(target.Id);
+            Audit(source.InvestigationId, "Location", sourceLocation.Id, "EntityMerged", sourceLocation);
+        }
+        var eventLinks = await db.EventEntities.Where(x => x.EntityId == source.Id).ToListAsync(ct);
+        foreach (var link in eventLinks)
+        {
+            var item = await db.Events.SingleAsync(x => x.Id == link.EventId, ct);
+            if (!await db.EventEntities.AnyAsync(x => x.EventId == link.EventId && x.EntityId == target.Id, ct))
+                db.EventEntities.Add(new(item, target.Id));
+            db.EventEntities.Remove(link); item.Touch();
+            Audit(source.InvestigationId, "Event", item.Id, "EntitiesMerged", item);
+        }
         var relationships = await db.Relationships.Where(x => x.SourceEntityId == source.Id || x.TargetEntityId == source.Id).ToListAsync(ct);
         foreach (var relationship in relationships)
         {

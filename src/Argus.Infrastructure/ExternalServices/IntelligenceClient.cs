@@ -9,7 +9,7 @@ using Microsoft.Extensions.Options;
 
 namespace Argus.Infrastructure.ExternalServices;
 
-public sealed class IntelligenceClient(HttpClient http, IOptions<IntelligenceOptions> options) : IIntelligenceClient, IRelationshipClient
+public sealed class IntelligenceClient(HttpClient http, IOptions<IntelligenceOptions> options) : IIntelligenceClient, IRelationshipClient, IEventClient
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     { Converters = { new JsonStringEnumConverter(allowIntegerValues: false) } };
@@ -38,6 +38,13 @@ public sealed class IntelligenceClient(HttpClient http, IOptions<IntelligenceOpt
     {
         if (text.Length > options.Value.MaxTextCharacters)
             throw new ProcessingException("text_limit", "Source text exceeds the configured local pipeline limit; no truncation was performed.");
+    }
+    public async Task<EventProcessingResponse> ProcessEventsAsync(NlpRequest request, CancellationToken ct)
+    {
+        CheckText(request.Text);
+        var response = await SendAsync<EventProcessingResponse>("process/events", request, ct);
+        TemporalRules.Validate(request, response);
+        return response;
     }
     private async Task<T> SendAsync<T>(string path, object request, CancellationToken ct)
     {

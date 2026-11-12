@@ -7,6 +7,7 @@
 else if (item is not null)
 {
     <a href="@($"/investigations/{item.Source.InvestigationId}/sources")">Back to investigation sources</a>
+    <a href="@($"/investigations/{item.Source.InvestigationId}/timeline")">Timeline and date extraction</a>
     <p class="eyebrow">SOURCE VIEWER / @item.Source.SourceType / @item.Source.ProcessingStatus</p>
     <h1>@item.Source.Title</h1>
     <ProcessingPanel @key="(Id, nameof(ProcessingPanel))" SourceId="Id" InvestigationId="item.Source.InvestigationId" Changed="ProcessingChangedAsync" />

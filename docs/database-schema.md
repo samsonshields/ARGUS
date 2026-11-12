@@ -132,3 +132,31 @@ Entity merges redirect relationship endpoints atomically with mention moves and 
 updates. Self-links are retired, not deleted; parallel relationships stay distinct.
 No approval or evidence history is silently collapsed. Graph queries exclude retired
 and rejected records; detail endpoints retain history/citations for investigation review.
+
+## Phase 5 migration: TimelineGeography
+
+Adds Events (AnalysisEvent), EventEvidence, EventEntities, Locations (LocationProfile),
+LocationEvidence and GeographicFocus. All finding/evidence identities are GUIDs; stored
+creation/removal timestamps are UTC. DateOnly event bounds are research dates. Event
+precision stays separate from interval bounds; UNKNOWN has no calendar values. CHECK
+constraints enforce statuses, event types, nonempty titles, date order, coordinate
+ranges/precision, positive approximate radii and citation spans. Revisions protect review,
+correction, evidence changes and merging. Existing Phase 4 records remain unchanged.
+
+Event/location composite keys and foreign keys enforce investigation-scoped entity and
+location associations. EventEntities is unique by event/entity. Locations has a filtered
+unique index for one active profile per entity. Event origin keys are unique across
+reruns; soft deletion leaves those keys intact. Event job provenance references the
+persistent ProcessingJob. EVENTS needs no job table rebuild: Kind already stores strings.
+
+Evidence uniquely identifies parent/snapshot/start/end, references the original
+SourceTextSnapshot through snapshot/source composite keys and retains Active=false
+rows when citations are removed. Quotes always derive from the immutable snapshot.
+Finding approval requires active evidence at the application/domain boundary; all
+mutations and corresponding audit entries save atomically. Finding/evidence FKs use
+RESTRICT. Removed findings remain in the database, keeping original dates, reasons,
+links and citations. No finding or source is hard-deleted by these review APIs.
+
+GeographicFocus is an investigation-keyed viewport preference (latitude/longitude/zoom)
+with range constraints. Only this view preference cascades when an otherwise empty
+investigation is deleted. It is not an assertion of geographic truth and needs no citation.

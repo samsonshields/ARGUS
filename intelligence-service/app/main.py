@@ -13,8 +13,10 @@ from spacy.language import Language
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.models.entities import EntityRequest, EntityResponse, ModelInfo
+from app.models.events import EventResponse
 from app.models.relationships import RelationshipRequest, RelationshipResponse
 from app.pipelines.entities import ExtractionLimitError, extract_entities, load_pipeline
+from app.pipelines.events import extract_events
 from app.pipelines.relationships import extract_relationships
 
 logger = logging.getLogger("argus.intelligence")
@@ -180,6 +182,30 @@ def create_app(model_name: str | None = None) -> FastAPI:
         except Exception:
             logger.error("Co-mention generation failed; document and parser diagnostics omitted.")
             return problem(500, "pipeline_failed", "Local co-mention generation failed.")
+        finally:
+            gate.release()
+
+    @application.post("/process/events", response_model=EventResponse)
+    def events(payload: EntityRequest) -> EventResponse | JSONResponse:
+        if len(payload.text.encode("utf-16-le")) // 2 > max_characters:
+            return problem(422, "text_limit", "Text exceeds the configured event extraction limit.")
+        if not gate.acquire(blocking=False):
+            return problem(
+                503, "service_busy", "The local pipeline is processing another document."
+            )
+        try:
+            return EventResponse(
+                sourceId=str(payload.sourceId),
+                textHash=payload.textHash,
+                events=extract_events(sentence_pipeline, payload.text),
+            )
+        except ExtractionLimitError:
+            return problem(
+                422, "candidate_limit", "Date candidate or source passage limit exceeded."
+            )
+        except Exception:
+            logger.error("Date candidate extraction failed; document diagnostics omitted.")
+            return problem(500, "pipeline_failed", "Local date candidate extraction failed.")
         finally:
             gate.release()
 

@@ -9,6 +9,8 @@ else
 {
     <a href="@($"/investigations/{entity.InvestigationId}/entities")">Investigation entities and review</a>
     <a href="@($"/investigations/{entity.InvestigationId}/graph")">Investigation graph</a>
+    <a href="@($"/investigations/{entity.InvestigationId}/map")">Investigation geography</a>
+    <a href="@($"/investigations/{entity.InvestigationId}/timeline")">Investigation timeline</a>
     <p class="eyebrow">ANALYST-APPROVED ENTITY</p><h1>@entity.Name</h1>
     <p>@entity.Type / @entity.MentionCount approved mentions</p>
     @if (success is not null) { <p role="status" class="success">@success</p> }
