@@ -4,10 +4,12 @@ export function render(element, data, dotnet, investigationId) {
     let state = maps.get(element);
     if (state && state.investigationId !== investigationId) { dispose(element); state = null; }
     if (!state) {
-        const map = L.map(element, { worldCopyJump: true, minZoom: 1, maxZoom: 18 });
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const map = L.map(element, { worldCopyJump: true, minZoom: 1, maxZoom: 18, fadeAnimation: false,
+            zoomAnimation: !reducedMotion, markerZoomAnimation: !reducedMotion });
         const focus = data.focus || { latitude: 20, longitude: 0, zoom: 2 };
         map.setView([focus.latitude, focus.longitude], focus.zoom);
-        if (!data.focus && data.locations.length) map.fitBounds(data.locations.map(item => [item.latitude, item.longitude]), { maxZoom: 7, padding: [40, 40] });
+        if (!data.focus && data.locations.length) map.fitBounds(data.locations.map(item => [item.latitude, item.longitude]), { maxZoom: 7, padding: [40, 40], animate: false });
         const Grid = L.GridLayer.extend({ createTile(coords) {
             const tile = document.createElement('div'); tile.className = 'coordinate-tile';
             const point = map.unproject(L.point(coords.x * 256 + 128, coords.y * 256 + 128), coords.z).wrap();

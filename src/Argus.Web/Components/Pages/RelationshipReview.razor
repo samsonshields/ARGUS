@@ -2,17 +2,18 @@
 @rendermode InteractiveServer
 @inject GraphApiClient Client
 <PageTitle>ARGUS | Relationship review</PageTitle>
+<InvestigationNav Id="Id" />
 <a href="@($"/investigations/{Id}")">Investigation overview</a> / <a href="@($"/investigations/{Id}/graph")">Relationship graph</a>
 <h1>Relationship review</h1>
 <p class="muted">Approve entity mentions first, then generate sentence co-mention proposals. No relationship is automatically approved.</p>
-@if (error is not null) { <p role="alert" class="error">@error</p> }
+@if (error is not null) { <ErrorNotice Message="@error" /> }
 @if (message is not null) { <p role="status">@message</p> }
 <div class="actions"><button disabled="@busy" @onclick="GenerateAsync">Generate co-mention candidates</button><a href="/processing-jobs">Monitor background jobs</a></div>
 <div class="filters"><label>Review status<select @bind="status"><option value="">All statuses</option><option>PROPOSED</option><option>APPROVED</option><option>REJECTED</option></select></label>
     <label>Relationship type<select @bind="type"><option value="">All types</option>@foreach (var item in Enum.GetValues<RelationshipType>()) { <option>@item</option> }</select></label>
     <button disabled="@busy" @onclick="RefreshAsync">Refresh relationships</button></div>
-@if (items is null) { <p role="status">Loading relationships...</p> }
-else
+@if (items is null && error is null) { <p role="status">Loading relationships...</p> }
+else if (items is not null)
 {
     @if (items.Total == 0) { <p class="panel">No relationships match this view. Proposals require two different approved entities in one sentence.</p> }
     @foreach (var relationship in items.Items)
@@ -36,7 +37,7 @@ else
     private async Task LoadAsync()
     {
         try { items = await Client.ListAsync(Id, status, type, page); }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { error = "Relationship loading timed out."; }
     }
     private async Task RefreshAsync() { page = 1; error = null; await LoadAsync(); }
@@ -45,7 +46,7 @@ else
     {
         busy = true; error = null;
         try { var result = await Client.GenerateAsync(Id); message = $"Queued {result.Jobs.Count} source jobs; {result.BusySources} sources already busy. Monitor jobs, then refresh this list."; }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { error = "Queue request timed out. Check jobs before retrying."; }
         finally { busy = false; }
     }

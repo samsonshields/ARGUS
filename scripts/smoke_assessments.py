@@ -322,9 +322,11 @@ def main() -> None:
             wait_for(api_url + "/health", api)
             assert call(f"/reports/{report_id}")["markdown"] == artifact["markdown"]
             assert call(f"/claims/{claim_id}")["claim"]["confidenceLevel"] == "LOW"
-            expect_error(lambda: request(route + f"/investigations/{inv}/backups"), 404)
+            expect_error(
+                lambda: request(route + f"/investigations/{inv}/collaboration"), 404
+            )
             print(
-                "PASS: real claim editor, supporting/contradictory/context passages, source reliability, explicit confidence/review, unresolved acknowledgment, filters, report validation, immutable Markdown download/hash, CommonMark rendering/anchors, escaped malicious content, correction withdrawal and API restart persistence; Phase 7 absent."
+                "PASS: real claim editor, supporting/contradictory/context passages, source reliability, explicit confidence/review, unresolved acknowledgment, filters, report validation, immutable Markdown download/hash, CommonMark rendering/anchors, escaped malicious content, correction withdrawal and API restart persistence; no multi-user endpoints."
             )
         finally:
             stop(web)

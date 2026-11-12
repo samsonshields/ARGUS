@@ -71,7 +71,7 @@
                 await Changed.InvokeAsync();
             }
         }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { error = "Job refresh timed out."; }
     }
     private async Task QueueAsync() => await ExecuteAsync(async () => { await Client.QueueAsync(SourceId!.Value); page = 1; });
@@ -80,7 +80,7 @@
     {
         busy = true; error = null;
         try { await action(); await LoadAsync(); }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { error = "The request timed out. Refresh before retrying."; }
         finally { busy = false; }
     }

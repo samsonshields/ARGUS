@@ -1,0 +1,545 @@
+{
+  "formatVersion": 1,
+  "title": "Operation Meridian — Regional Logistics and Maritime Activity",
+  "description": "FICTIONAL TRAINING INVESTIGATION. All names, organizations, locations and events are fabricated. Compare conflicting activity records, preserve uncertainty, and build a source-backed assessment. Hypothetical map points are selected in open water and do not identify real facilities.",
+  "region": "Fictional Meridian exercise area",
+  "entities": [
+    {
+      "key": "org1",
+      "name": "Aster Maritime Union",
+      "type": "ORGANIZATION",
+      "aliases": []
+    },
+    {
+      "key": "org2",
+      "name": "Meridian Port Council",
+      "type": "ORGANIZATION",
+      "aliases": []
+    },
+    {
+      "key": "org3",
+      "name": "Northstar Transit Bureau",
+      "type": "ORGANIZATION",
+      "aliases": []
+    },
+    {
+      "key": "person1",
+      "name": "Mara Ellison",
+      "type": "PERSON",
+      "aliases": [
+        "Mara E. Ellison"
+      ]
+    },
+    {
+      "key": "person2",
+      "name": "Jonas Vale",
+      "type": "PERSON",
+      "aliases": []
+    },
+    {
+      "key": "person3",
+      "name": "Leila Corven",
+      "type": "PERSON",
+      "aliases": []
+    },
+    {
+      "key": "person4",
+      "name": "Tomas Arlen",
+      "type": "PERSON",
+      "aliases": []
+    },
+    {
+      "key": "person5",
+      "name": "Nadia Selwyn",
+      "type": "PERSON",
+      "aliases": []
+    },
+    {
+      "key": "person6",
+      "name": "Ivo Maren",
+      "type": "PERSON",
+      "aliases": []
+    },
+    {
+      "key": "place1",
+      "name": "Port Meridian",
+      "type": "LOCATION",
+      "aliases": []
+    },
+    {
+      "key": "place2",
+      "name": "Aster Quay",
+      "type": "LOCATION",
+      "aliases": []
+    },
+    {
+      "key": "place3",
+      "name": "Selwyn Anchorage",
+      "type": "LOCATION",
+      "aliases": []
+    },
+    {
+      "key": "place4",
+      "name": "Northstar Depot",
+      "type": "LOCATION",
+      "aliases": []
+    },
+    {
+      "key": "place5",
+      "name": "Corven Point",
+      "type": "LOCATION",
+      "aliases": []
+    }
+  ],
+  "documents": [
+    {
+      "key": "d01",
+      "file": "documents/d01.txt",
+      "title": "FICTIONAL Meridian 01 - activity record",
+      "publisher": "Fictional Meridian Training Desk",
+      "publishedAt": "2026-04-01",
+      "reliability": "B"
+    },
+    {
+      "key": "d02",
+      "file": "documents/d02.txt",
+      "title": "FICTIONAL Meridian 02 - activity record",
+      "publisher": "Fictional Meridian Training Desk",
+      "publishedAt": "2026-04-02",
+      "reliability": "C"
+    },
+    {
+      "key": "d03",
+      "file": "documents/d03.txt",
+      "title": "FICTIONAL Meridian 03 - activity record",
+      "publisher": "Fictional Meridian Training Desk",
+      "publishedAt": "2026-04-03",
+      "reliability": "B"
+    },
+    {
+      "key": "d04",
+      "file": "documents/d04.txt",
+      "title": "FICTIONAL Meridian 04 - activity record",
+      "publisher": "Fictional Meridian Training Desk",
+      "publishedAt": "2026-04-04",
+      "reliability": "C"
+    },
+    {
+      "key": "d05",
+      "file": "documents/d05.txt",
+      "title": "FICTIONAL Meridian 05 - activity record",
+      "publisher": "Fictional Meridian Training Desk",
+      "publishedAt": "2026-04-05",
+      "reliability": "B"
+    },
+    {
+      "key": "d06",
+      "file": "documents/d06.txt",
+      "title": "FICTIONAL Meridian 06 - activity record",
+      "publisher": "Fictional Meridian Training Desk",
+      "publishedAt": "2026-04-06",
+      "reliability": "C"
+    },
+    {
+      "key": "d07",
+      "file": "documents/d07.txt",
+      "title": "FICTIONAL Meridian 07 - activity record",
+      "publisher": "Fictional Meridian Training Desk",
+      "publishedAt": "2026-04-07",
+      "reliability": "B"
+    },
+    {
+      "key": "d08",
+      "file": "documents/d08.txt",
+      "title": "FICTIONAL Meridian 08 - activity record",
+      "publisher": "Fictional Meridian Training Desk",
+      "publishedAt": "2026-04-08",
+      "reliability": "C"
+    },
+    {
+      "key": "d09",
+      "file": "documents/d09.txt",
+      "title": "FICTIONAL Meridian 09 - activity record",
+      "publisher": "Fictional Meridian Training Desk",
+      "publishedAt": "2026-04-09",
+      "reliability": "B"
+    },
+    {
+      "key": "d10",
+      "file": "documents/d10.txt",
+      "title": "FICTIONAL Meridian 10 - activity record",
+      "publisher": "Fictional Meridian Training Desk",
+      "publishedAt": "2026-04-10",
+      "reliability": "C"
+    },
+    {
+      "key": "d11",
+      "file": "documents/d11.txt",
+      "title": "FICTIONAL Meridian 11 - conflicting account",
+      "publisher": "Fictional Meridian Training Desk",
+      "publishedAt": "2026-04-11",
+      "reliability": "D"
+    },
+    {
+      "key": "d12",
+      "file": "documents/d12.txt",
+      "title": "FICTIONAL Meridian 12 - conflicting account",
+      "publisher": "Fictional Meridian Training Desk",
+      "publishedAt": "2026-04-12",
+      "reliability": "D"
+    }
+  ],
+  "locations": [
+    {
+      "entity": "place1",
+      "latitude": 31.0,
+      "longitude": -28.0,
+      "precision": "APPROXIMATE",
+      "uncertaintyMeters": 10000,
+      "document": "d07"
+    },
+    {
+      "entity": "place2",
+      "latitude": 31.12,
+      "longitude": -28.15,
+      "precision": "APPROXIMATE",
+      "uncertaintyMeters": 10000,
+      "document": "d08"
+    },
+    {
+      "entity": "place3",
+      "latitude": 31.24,
+      "longitude": -28.3,
+      "precision": "APPROXIMATE",
+      "uncertaintyMeters": 10000,
+      "document": "d09"
+    },
+    {
+      "entity": "place4",
+      "latitude": 31.36,
+      "longitude": -28.45,
+      "precision": "APPROXIMATE",
+      "uncertaintyMeters": 10000,
+      "document": "d10"
+    },
+    {
+      "entity": "place5",
+      "latitude": 31.48,
+      "longitude": -28.6,
+      "precision": "APPROXIMATE",
+      "uncertaintyMeters": 25000,
+      "document": "d01"
+    }
+  ],
+  "events": [
+    {
+      "document": "d01",
+      "dateText": "2026-02-01",
+      "title": "Fictional activity 01: Mara Ellison",
+      "type": "MEETING",
+      "location": null,
+      "entities": [
+        "person1",
+        "org1"
+      ],
+      "precision": "EXACT"
+    },
+    {
+      "document": "d02",
+      "dateText": "2026-02-02",
+      "title": "Fictional activity 02: Jonas Vale",
+      "type": "MEETING",
+      "location": null,
+      "entities": [
+        "person2",
+        "org1"
+      ],
+      "precision": "EXACT"
+    },
+    {
+      "document": "d03",
+      "dateText": "2026-02-03",
+      "title": "Fictional activity 03: Leila Corven",
+      "type": "MEETING",
+      "location": null,
+      "entities": [
+        "person3",
+        "org2"
+      ],
+      "precision": "EXACT"
+    },
+    {
+      "document": "d04",
+      "dateText": "2026-02-04",
+      "title": "Fictional activity 04: Tomas Arlen",
+      "type": "MEETING",
+      "location": null,
+      "entities": [
+        "person4",
+        "org2"
+      ],
+      "precision": "EXACT"
+    },
+    {
+      "document": "d05",
+      "dateText": "2026-02-05",
+      "title": "Fictional activity 05: Nadia Selwyn",
+      "type": "MEETING",
+      "location": null,
+      "entities": [
+        "person5",
+        "org3"
+      ],
+      "precision": "EXACT"
+    },
+    {
+      "document": "d06",
+      "dateText": "2026-02-06",
+      "title": "Fictional activity 06: Ivo Maren",
+      "type": "MEETING",
+      "location": null,
+      "entities": [
+        "person6",
+        "org3"
+      ],
+      "precision": "EXACT"
+    },
+    {
+      "document": "d07",
+      "dateText": "2026-02-07",
+      "title": "Fictional activity 07: Aster Maritime Union",
+      "type": "MOVEMENT",
+      "location": "place1",
+      "entities": [
+        "org1",
+        "place1"
+      ],
+      "precision": "EXACT"
+    },
+    {
+      "document": "d08",
+      "dateText": "2026-02-08",
+      "title": "Fictional activity 08: Aster Maritime Union",
+      "type": "MOVEMENT",
+      "location": "place2",
+      "entities": [
+        "org1",
+        "place2"
+      ],
+      "precision": "EXACT"
+    },
+    {
+      "document": "d09",
+      "dateText": "March 2026",
+      "title": "Fictional activity 09: Meridian Port Council",
+      "type": "MOVEMENT",
+      "location": "place3",
+      "entities": [
+        "org2",
+        "place3"
+      ],
+      "precision": "MONTH"
+    },
+    {
+      "document": "d10",
+      "dateText": "2026",
+      "title": "Fictional activity 10: Northstar Transit Bureau",
+      "type": "MOVEMENT",
+      "location": "place4",
+      "entities": [
+        "org3",
+        "place4"
+      ],
+      "precision": "YEAR"
+    }
+  ],
+  "relationships": [
+    {
+      "source": "person1",
+      "target": "org1"
+    },
+    {
+      "source": "person2",
+      "target": "org1"
+    },
+    {
+      "source": "person3",
+      "target": "org2"
+    },
+    {
+      "source": "person4",
+      "target": "org2"
+    },
+    {
+      "source": "person5",
+      "target": "org3"
+    },
+    {
+      "source": "person6",
+      "target": "org3"
+    },
+    {
+      "source": "org1",
+      "target": "place1"
+    },
+    {
+      "source": "org1",
+      "target": "place2"
+    },
+    {
+      "source": "org2",
+      "target": "place3"
+    },
+    {
+      "source": "org3",
+      "target": "place4"
+    },
+    {
+      "source": "org2",
+      "target": "place5"
+    },
+    {
+      "source": "person1",
+      "target": "person2"
+    },
+    {
+      "source": "person3",
+      "target": "person4"
+    },
+    {
+      "source": "person5",
+      "target": "person6"
+    },
+    {
+      "source": "org1",
+      "target": "org2"
+    },
+    {
+      "source": "org2",
+      "target": "org3"
+    },
+    {
+      "source": "person1",
+      "target": "place3"
+    },
+    {
+      "source": "person6",
+      "target": "place5"
+    }
+  ],
+  "reviewedRelationships": [
+    {
+      "source": "person1",
+      "target": "org1",
+      "type": "MEMBER_OF",
+      "notes": "Explicit fictional source states membership; analyst reviewed the preserved passage."
+    },
+    {
+      "source": "person2",
+      "target": "org1",
+      "type": "MENTIONED_WITH",
+      "notes": "Same-sentence occurrence only; no substantive relationship inferred."
+    },
+    {
+      "source": "person3",
+      "target": "org2",
+      "type": "MENTIONED_WITH",
+      "notes": "Same-sentence occurrence only; no substantive relationship inferred."
+    }
+  ],
+  "claims": [
+    {
+      "statement": "The date of the fictional membership record involving Mara Ellison remains disputed.",
+      "confidence": "LOW",
+      "reasoning": "Two fabricated sources describe the same membership record but specify different dates. Source grading does not resolve this contradiction.",
+      "evidence": [
+        {
+          "document": "d01",
+          "relationship": "SUPPORTS"
+        },
+        {
+          "document": "d11",
+          "relationship": "CONTRADICTS"
+        },
+        {
+          "document": "d07",
+          "relationship": "CONTEXT"
+        }
+      ]
+    },
+    {
+      "statement": "The date of the fictional Jonas Vale meeting remains disputed.",
+      "confidence": "MODERATE",
+      "reasoning": "The training accounts agree on the participants and conflict on the date. The discrepancy remains unresolved and is retained explicitly.",
+      "evidence": [
+        {
+          "document": "d02",
+          "relationship": "SUPPORTS"
+        },
+        {
+          "document": "d12",
+          "relationship": "CONTRADICTS"
+        }
+      ]
+    },
+    {
+      "statement": "A fabricated activity record describes an Aster Maritime Union visit to Aster Quay.",
+      "confidence": "MODERATE",
+      "reasoning": "The selected fictional passage states a visit. It does not establish purpose, wrongdoing or independent verification.",
+      "evidence": [
+        {
+          "document": "d08",
+          "relationship": "SUPPORTS"
+        },
+        {
+          "document": "d07",
+          "relationship": "CONTEXT"
+        }
+      ]
+    },
+    {
+      "statement": "An exact day cannot be established for the fictional activities described only by month or year.",
+      "confidence": "INSUFFICIENT_INFORMATION",
+      "reasoning": "The fabricated sources specify March 2026 and 2026 respectively. No exact day, reference date or missing temporal detail is inferred.",
+      "evidence": [
+        {
+          "document": "d09",
+          "relationship": "SUPPORTS"
+        },
+        {
+          "document": "d10",
+          "relationship": "SUPPORTS"
+        }
+      ]
+    },
+    {
+      "statement": "A fabricated training record places Ivo Maren and Northstar Transit Bureau in the same reported meeting.",
+      "confidence": "MODERATE",
+      "reasoning": "The quoted source records a meeting only. This analytical statement makes no broader claim about affiliations or intent.",
+      "evidence": [
+        {
+          "document": "d06",
+          "relationship": "SUPPORTS"
+        },
+        {
+          "document": "d10",
+          "relationship": "CONTEXT"
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "organizations": 3,
+    "people": 6,
+    "locations": 5,
+    "documents": 12,
+    "approvedEvents": 10,
+    "relationships": 18,
+    "proposedRelationships": 15,
+    "reviewedRelationships": 3,
+    "claims": 5,
+    "unresolvedClaims": 2,
+    "contradictoryReports": 2,
+    "mappedEvents": 4
+  }
+}

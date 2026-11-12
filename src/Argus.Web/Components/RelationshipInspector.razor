@@ -67,7 +67,7 @@ else if (Id.HasValue) { <p role="status">Loading relationship evidence...</p> }
             detail = await Client.DetailAsync(Id!.Value, evidencePage);
             review = new() { Type = detail.Relationship.Type, Notes = detail.Relationship.Notes, CustomLabel = detail.Relationship.CustomLabel };
         }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { error = "Evidence loading timed out."; }
     }
     private void Toggle(Guid id) { if (!selected.Add(id)) selected.Remove(id); review.EvidenceIds = selected.ToList(); }
@@ -76,7 +76,7 @@ else if (Id.HasValue) { <p role="status">Loading relationship evidence...</p> }
     {
         busy = true; error = null;
         try { review.EvidenceIds = selected.ToList(); detail = await Client.ApproveAsync(Id!.Value, review); evidencePage = 1; selected.Clear(); success = "Relationship evidence approved. Co-mention remains a low-assertion connection."; await LoadAsync(); await Reviewed.InvokeAsync(); }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { error = "Review timed out. Refresh before retrying."; }
         finally { busy = false; }
     }
@@ -84,7 +84,7 @@ else if (Id.HasValue) { <p role="status">Loading relationship evidence...</p> }
     {
         busy = true; error = null;
         try { await Client.RejectAsync(Id!.Value); success = "Proposal rejected; its source history is retained."; selected.Clear(); await LoadAsync(); await Reviewed.InvokeAsync(); }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { error = "Rejection timed out. Refresh before retrying."; }
         finally { busy = false; }
     }

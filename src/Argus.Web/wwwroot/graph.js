@@ -14,7 +14,8 @@ export function mount(element, graph, receiver) {
         style: [
             {selector: "node", style: {label: "data(label)", "background-color": "#7ecbd8", color: "#e1e9f0",
                 "font-size": 11, "text-valign": "bottom", "text-margin-y": 6, width: 28, height: 28,
-                "text-wrap": "ellipsis", "text-max-width": 140, "border-width": 1, "border-color": "#b3e1e8"}},
+                "text-wrap": "wrap", "text-max-width": 105, "text-background-color": "#101d2b", "text-background-opacity": 0.9,
+                "text-background-padding": 2, "border-width": 1, "border-color": "#b3e1e8"}},
             {selector: 'node[type="ORGANIZATION"]', style: {shape: "round-rectangle", "background-color": "#b0b7dc"}},
             {selector: 'node[type="LOCATION"]', style: {shape: "diamond", "background-color": "#8bc7a6"}},
             {selector: "edge", style: {width: 2, "curve-style": "bezier", "line-color": "#7ecbd8", "target-arrow-color": "#7ecbd8",
@@ -35,7 +36,8 @@ export function mount(element, graph, receiver) {
     cy.on("tap", "edge", event => receiver.invokeMethodAsync("EdgeSelected", event.target.id()).catch(() => {}));
     cy.on("pan zoom", () => { element.dataset.pan = JSON.stringify(cy.pan()); element.dataset.zoom = String(cy.zoom()); });
     if (graph.nodes.length > 1 && graph.nodes.length <= 300)
-        cy.layout({name: "cose", animate: false, randomize: false, numIter: 400, padding: 45, componentSpacing: 80}).run();
+        cy.layout({name: "cose", animate: false, randomize: false, numIter: 400, padding: 50, componentSpacing: 100,
+            nodeDimensionsIncludeLabels: true, nodeRepulsion: () => 9000, idealEdgeLength: () => 100, nodeOverlap: 20}).run();
     element.dataset.nodes = String(graph.nodes.length);
     element.dataset.edges = String(graph.edges.length);
     element.dataset.renderMilliseconds = String(Math.round(performance.now() - started));
@@ -54,7 +56,11 @@ export function select(element, id) {
     selected.select();
     const focus = selected.isNode() ? selected.closedNeighborhood() : selected.union(selected.connectedNodes());
     cy.fit(focus, 80);
-    cy.center(selected);
+    if (selected.isNode()) {
+        // Center the node body, not its label-inclusive bounding box.
+        const position = selected.position();
+        cy.pan({x: cy.width() / 2 - position.x * cy.zoom(), y: cy.height() / 2 - position.y * cy.zoom()});
+    } else cy.center(selected);
 }
 export function action(element, command, id) {
     const {cy} = state(element);

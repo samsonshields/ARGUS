@@ -1,4 +1,4 @@
-# Architecture through Phase 6
+# Architecture through Phase 7
 
 The repository root is the proposed argus monorepo root. The supplied specification
 is project_specifications.md; the requested hyphenated filename is absent. There was
@@ -215,5 +215,55 @@ is used only for smoke verification, not in the production request path. The ver
 also found and corrected SQLite-vs-UTF-16 substring mismatch: citation slicing now stays
 in .NET, including temporal quotations used in reports.
 
-Phase 7 quality/performance/backup/demo/portfolio work has not been started. See
+Phase 7 was subsequently authorized and is described below. See
 [assessment contracts](assessment-contracts.md) for explicit export bounds and semantics.
+
+## Phase 7: quality, recovery and reproducible demonstrations
+
+```mermaid
+flowchart LR
+    Browser --> Web[Blazor Web]
+    Web -->|typed HTTP clients| API[Versioned .NET API]
+    API --> Core[Core rules and contracts]
+    API --> DB[(EF Core / SQLite)]
+    API --> Originals[Managed originals]
+    API -->|bounded HTTP| NLP[Local FastAPI / spaCy]
+    API -->|online snapshot and verified originals| ZIP[Workspace archive]
+    ZIP -->|offline validated restore| NewData[New data directory]
+```
+
+Web still has no database/storage dependency, Python has no persistence dependency,
+and Core contains no HTTP/EF code. BackupArchive in Infrastructure owns the SQLite
+online-backup/ZIP/manifest/restore mechanics. BackupService coordinates bounded exports
+and streaming cleanup; the controller is a transport adapter. The CLI restore branch
+runs before host startup, validates into a new staging directory and never replaces
+an existing workspace. The downloaded artifact includes data, not application code,
+models or configuration. See quality-contracts.md for validation and limits.
+
+Claim, timeline and location list queries batch evidence/association/name data. The
+WorkspaceQuality migration adds indexes without rewriting findings. Tests enforce fixed
+query budgets as row counts grow; revision checks and exact UTF-16 quotations remain
+unchanged. Read-only dashboard HTTP requests use separate clients concurrently; no EF
+context is used concurrently. Graph labels/layout account for text dimensions while
+preserving node/edge semantics and existing performance limits.
+
+Shared context navigation and actionable error states make transitions between sources,
+review, graph, chronology, geography and reporting consistent. Focused form/filter styles,
+responsive layouts, skip navigation and reduced-motion support refine the existing theme.
+Application diagnostics use structured UTC JSON and safe request metadata; document text,
+search values and parser details are omitted. Persistent audit history remains separate
+from diagnostic logs.
+
+The fictional Operation Meridian manifest/documents are data under sample-data. A Python
+loader calls only the real public APIs for imports, processing, explicit review/merge,
+events, geography, claims and reports. Production startup does not seed or auto-approve
+sample facts. Real-model dataset tests and the complete browser/backup/restore smoke
+exercise the same fixture. Portfolio screenshots are generated from these fictional
+records. scripts/verify.ps1 and the source-only clean-checkout check document executable
+verification paths, including a fresh locked Python installation.
+
+A Windows Git-ignore issue previously hid Infrastructure/Data C# files as runtime data.
+The ignore rule now targets actual runtime directories and keeps context/schema/migration
+source publishable. Source-only verification respects Git ignore rules so missing files
+cannot be masked by existing local binaries. All seven prescribed phases are implemented;
+no optional OCR, PDF report export, hosted authentication or multi-user system was added.

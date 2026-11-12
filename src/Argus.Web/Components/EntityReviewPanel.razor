@@ -57,7 +57,7 @@
     public async Task ReloadAsync()
     {
         try { items = await Client.MentionsAsync(InvestigationId, SourceId, null, status, page); }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { error = "Review list timed out. Refresh to retry."; }
     }
     private async Task RefreshAsync() { page = 1; evidence = null; error = success = null; await ReloadAsync(); }
@@ -71,7 +71,7 @@
             suggestions = await Client.SuggestionsAsync(id);
             selectedEntity = ""; approval = new() { Name = evidence.Mention.Text, Type = evidence.Mention.OriginalType };
         }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { error = "Candidate loading timed out."; }
         finally { busy = false; }
     }
@@ -94,7 +94,7 @@
             evidence = null; success = approve ? "Mention approved. The entity is now in the investigation entity list." : "Mention rejected; its source provenance is retained.";
             await ReloadAsync(); await Reviewed.InvokeAsync();
         }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { error = "Review timed out. Refresh before retrying."; }
         finally { busy = false; }
     }

@@ -3,19 +3,20 @@
 @inject IntelligenceApiClient Client
 @inject InvestigationClient Investigations
 <PageTitle>ARGUS | Entities</PageTitle>
+<InvestigationNav Id="Id" />
 <a href="@($"/investigations/{Id}")">Investigation overview</a>
 <a href="@($"/investigations/{Id}/graph")">Relationship graph</a>
 <a href="@($"/investigations/{Id}/relationships")">Relationship review</a>
 <p class="eyebrow">@investigation?.Title</p><h1>Entities and review</h1>
-@if (error is not null) { <p role="alert" class="error">@error</p> }
-@if (investigation is null) { <p>Loading investigation, or investigation unavailable.</p> }
-else
+@if (error is not null) { <ErrorNotice Message="@error" /> }
+@if (investigation is null && error is null) { <p role="status">Loading investigation?</p> }
+else if (investigation is not null)
 {
     <EntityReviewPanel @key="Id" InvestigationId="Id" Reviewed="LoadAsync" />
     <h2>Approved entities</h2>
     <form @onsubmit="SearchAsync" @onsubmit:preventDefault class="filters"><label>Canonical name<input @bind="search" maxlength="200" /></label><button type="submit">Search entities</button></form>
-    @if (items is null) { <p role="status">Loading entities...</p> }
-    else
+    @if (items is null && error is null) { <p role="status">Loading entities...</p> }
+    else if (items is not null)
     {
         @if (items.Total == 0) { <p class="panel">No approved entities match this view.</p> }
         @foreach (var entity in items.Items)
@@ -40,7 +41,7 @@ else
     private async Task LoadAsync()
     {
         try { items = await Client.EntitiesAsync(Id, search, page); }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { error = "Entity loading timed out."; }
     }
     private async Task SearchAsync() { page = 1; await LoadAsync(); }

@@ -1,5 +1,4 @@
 import asyncio
-import logging
 import os
 from contextlib import asynccontextmanager
 from threading import Lock
@@ -12,6 +11,7 @@ from fastapi.responses import JSONResponse
 from spacy.language import Language
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from app.logging_utils import application_logger
 from app.models.entities import EntityRequest, EntityResponse, ModelInfo
 from app.models.events import EventResponse
 from app.models.relationships import RelationshipRequest, RelationshipResponse
@@ -19,7 +19,7 @@ from app.pipelines.entities import ExtractionLimitError, extract_entities, load_
 from app.pipelines.events import extract_events
 from app.pipelines.relationships import extract_relationships
 
-logger = logging.getLogger("argus.intelligence")
+logger = application_logger()
 MAX_BODY = 12_100_000
 
 
@@ -156,7 +156,10 @@ def create_app(model_name: str | None = None) -> FastAPI:
         except ExtractionLimitError:
             return problem(422, "candidate_limit", "Entity results exceeded the processing limits.")
         except Exception:
-            logger.error("Entity pipeline failed; submitted text and parser diagnostics omitted.")
+            logger.error(
+                "Entity pipeline failed; submitted text and parser diagnostics omitted.",
+                extra={"SourceId": str(payload.sourceId), "Pipeline": "entities"},
+            )
             return problem(500, "pipeline_failed", "The local entity pipeline failed.")
         finally:
             gate.release()
@@ -180,7 +183,10 @@ def create_app(model_name: str | None = None) -> FastAPI:
                 422, "candidate_limit", "Co-mention candidate or passage limit exceeded."
             )
         except Exception:
-            logger.error("Co-mention generation failed; document and parser diagnostics omitted.")
+            logger.error(
+                "Co-mention generation failed; document and parser diagnostics omitted.",
+                extra={"SourceId": str(payload.sourceId), "Pipeline": "relationships"},
+            )
             return problem(500, "pipeline_failed", "Local co-mention generation failed.")
         finally:
             gate.release()
@@ -204,7 +210,10 @@ def create_app(model_name: str | None = None) -> FastAPI:
                 422, "candidate_limit", "Date candidate or source passage limit exceeded."
             )
         except Exception:
-            logger.error("Date candidate extraction failed; document diagnostics omitted.")
+            logger.error(
+                "Date candidate extraction failed; document diagnostics omitted.",
+                extra={"SourceId": str(payload.sourceId), "Pipeline": "events"},
+            )
             return problem(500, "pipeline_failed", "Local date candidate extraction failed.")
         finally:
             gate.release()

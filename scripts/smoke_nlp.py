@@ -155,7 +155,9 @@ def main() -> None:
                 json.loads(request(route + f"/investigations/{inv}/graph"))["edges"]
                 == []
             )
-            expect_error(lambda: request(route + f"/investigations/{inv}/backups"), 404)
+            expect_error(
+                lambda: request(route + f"/investigations/{inv}/collaboration"), 404
+            )
             stop(nlp)
             nlp = None
             offline_job = json.loads(
@@ -198,7 +200,7 @@ def main() -> None:
             ) as download:
                 assert download.read() == original
             print(
-                "PASS: real FastAPI/spaCy + background API + Web; proposals, UTF-16 evidence, approval/rejection, deduplication, bounded offline failure/retry, durable queue restart, original preservation and no Phase 7 backup endpoints."
+                "PASS: real FastAPI/spaCy + background API + Web; proposals, UTF-16 evidence, approval/rejection, deduplication, bounded offline failure/retry, durable queue restart, original preservation and no multi-user collaboration endpoints."
             )
         finally:
             stop(web)

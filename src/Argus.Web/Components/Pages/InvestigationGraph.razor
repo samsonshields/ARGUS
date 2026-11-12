@@ -4,10 +4,11 @@
 @inject GraphApiClient Client
 @inject IJSRuntime JS
 <PageTitle>ARGUS | Relationship graph</PageTitle>
+<InvestigationNav Id="Id" />
 <a href="@($"/investigations/{Id}")">Investigation overview</a> / <a href="@($"/investigations/{Id}/relationships")">Relationship review</a>
 <h1>Relationship graph</h1>
 <p class="muted">Graph structure describes recorded connections, not importance, intent or threat. Co-mentions do not substantiate another relationship.</p>
-@if (error is not null) { <p role="alert" class="error">@error</p> }
+@if (error is not null) { <ErrorNotice Message="@error" /> }
 <form @onsubmit="LoadAsync" @onsubmit:preventDefault class="filters graph-filters">
     <label>Entity type<select aria-label="Entity type" @bind="entityType"><option value="">All entity types</option>@foreach (var type in Enum.GetValues<EntityType>()) { <option>@type</option> }</select></label>
     <label>Relationship type<select aria-label="Relationship type" @bind="relationshipType"><option value="">All relationship types</option>@foreach (var type in Enum.GetValues<RelationshipType>()) { <option>@type</option> }</select></label>
@@ -15,10 +16,11 @@
     <label><input type="checkbox" @bind="includeProposed" /> Include proposed edges</label>
     <button type="submit" disabled="@busy">Apply graph filters</button>
 </form>
-@if (graph is null) { <p role="status">Loading graph...</p> }
-else
+@if (graph is null && error is null) { <p role="status">Loading graph...</p> }
+else if (graph is not null)
 {
     <p role="status" id="graph-summary">@graph.Nodes.Count nodes / @graph.Edges.Count edges / @graph.ComponentCount connected components</p>
+    @if (graph.Nodes.Count == 0) { <p class="panel">No approved entities match this graph. Review source mentions in <a href="@($"/investigations/{Id}/entities")">Entities</a>, or clear the current filters.</p> }
     <div class="graph-legend"><span class="proposed-key">Dashed amber: proposed</span><span class="co-key">Dotted gray: reviewed co-mention</span><span class="approved-key">Solid cyan: analyst-reviewed substantive relationship</span></div>
     <div class="actions">
         <button disabled="@(!ready)" @onclick='() => ActionAsync("zoomIn")'>Zoom in</button>
@@ -77,7 +79,7 @@ else
             appliedEntityType = entityType; appliedRelationshipType = relationshipType; appliedProposed = includeProposed; appliedSearch = search;
             selectedNode = null; selectedEdge = null; nodeChoice = edgeChoice = ""; pathStart = pathEnd = null; repaint = true;
         }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { error = "Graph request timed out. Narrow the filters and retry."; }
         finally { busy = false; }
     }
@@ -128,7 +130,7 @@ else
             pathMessage = result.Found ? $"Path found: {result.EdgeIds.Count} connections." : "No path exists within the current filters.";
             if (module is not null) await module.InvokeVoidAsync("highlightPath", canvas, result);
         }
-        catch (HttpRequestException ex) { error = ex.Message; }
+        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
         catch (TaskCanceledException) { error = "Path search timed out."; }
         finally { busy = false; }
     }

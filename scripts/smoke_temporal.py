@@ -140,7 +140,10 @@ def main():
             browser_errors = []
             external = []
             with sync_playwright() as playwright:
-                browser = playwright.chromium.launch(channel="msedge", headless=True)
+                browser = playwright.chromium.launch(
+                    channel=os.environ.get("ARGUS_BROWSER_CHANNEL", "msedge"),
+                    headless=True,
+                )
                 page = browser.new_page(viewport={"width": 1440, "height": 1100})
                 page.on("pageerror", lambda error: browser_errors.append(str(error)))
 
@@ -329,9 +332,11 @@ def main():
                 and persisted["focus"]
             )
             assert call(f"/events/{item['id']}")["datePrecision"] == "MONTH"
-            expect_error(lambda: request(route + f"/investigations/{inv}/backups"), 404)
+            expect_error(
+                lambda: request(route + f"/investigations/{inv}/collaboration"), 404
+            )
             print(
-                "PASS: real date pipeline, exact/partial/relative/ambiguous dates, reviewed timeline updates, entity/source links, offline Leaflet markers/circles/selection/filtering, draft-only map clicks, location review, focus, optional tile failure/attribution, XSS-safe labels, deduplication and API restart persistence; Phase 7 absent."
+                "PASS: real date pipeline, exact/partial/relative/ambiguous dates, reviewed timeline updates, entity/source links, offline Leaflet markers/circles/selection/filtering, draft-only map clicks, location review, focus, optional tile failure/attribution, XSS-safe labels, deduplication and API restart persistence; no multi-user endpoints."
             )
         finally:
             stop(web)

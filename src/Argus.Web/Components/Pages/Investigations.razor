@@ -9,7 +9,7 @@
     <label>Status<select @bind="status"><option value="">All statuses</option><option>Active</option><option>Archived</option></select></label>
     <button disabled="@loading" type="submit">Apply filters</button>
 </form>
-@if (error is not null) { <p role="alert" class="error">@error</p> }
+@if (error is not null) { <ErrorNotice Message="@error" /> }
 @if (loading) { <p role="status">Loading investigations...</p> }
 else if (items.Count == 0 && error is null) { <div class="panel">No investigations match this view.</div> }
 else

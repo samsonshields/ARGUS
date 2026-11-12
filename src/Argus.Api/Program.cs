@@ -15,7 +15,21 @@ if (args.Length == 5 && args[0] == "--extract-pdf")
     Environment.ExitCode = TextExtraction.RunPdfWorker(args);
     return;
 }
+if (args.Length > 0 && args[0] == "--restore-backup")
+{
+    if (args.Length != 3) { Console.Error.WriteLine("Usage: --restore-backup <archive.zip> <new-data-directory>"); Environment.ExitCode = 2; return; }
+    try
+    {
+        using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        var result = await BackupArchive.RestoreAsync(args[1], args[2], deadline.Token);
+        Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(result));
+    }
+    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or Microsoft.Data.Sqlite.SqliteException or OperationCanceledException or ArgumentException)
+    { Console.Error.WriteLine(ex is InvalidDataException ? ex.Message : "Restore failed. Check the archive, destination permissions and available space."); Environment.ExitCode = 1; }
+    return;
+}
 var builder = WebApplication.CreateBuilder(args);
+builder.Logging.AddJsonConsole(options => { options.UseUtcTimestamp = true; options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ"; options.IncludeScopes = true; });
 builder.Services.AddControllers().AddJsonOptions(options =>
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(allowIntegerValues: false)));
 builder.Services.AddProblemDetails();
@@ -45,6 +59,7 @@ builder.Services.AddScoped<GraphService>();
 builder.Services.AddScoped<TemporalService>();
 builder.Services.AddScoped<ClaimService>();
 builder.Services.AddScoped<ReportService>();
+builder.Services.AddSingleton<BackupService>();
 builder.Services.AddHttpClient<IEventClient, IntelligenceClient>((services, client) =>
 {
     var options = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<IntelligenceOptions>>().Value;
@@ -86,6 +101,7 @@ builder.Services.AddDbContext<ArgusDbContext>((services, options) => options.Use
 builder.Services.AddScoped<IInvestigationRepository, InvestigationRepository>();
 builder.Services.AddScoped<InvestigationService>();
 var app = builder.Build();
+app.UseMiddleware<RequestTelemetry>();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 using (var scope = app.Services.CreateScope())

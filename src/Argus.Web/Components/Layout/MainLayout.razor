@@ -1,4 +1,5 @@
 @inherits LayoutComponentBase
+<a class="skip-link" href="#main-content">Skip to workspace</a>
 <div class="workstation">
     <aside>
         <a class="brand" href="/">ARGUS<span>ANALYSIS WORKSTATION</span></a>
@@ -6,11 +7,12 @@
             <NavLink href="/" Match="NavLinkMatch.All">Dashboard</NavLink>
             <NavLink href="/investigations">Investigations</NavLink>
             <NavLink href="/processing-jobs">Processing jobs</NavLink>
+            <NavLink href="/workspace-backup">Workspace backup</NavLink>
         </nav>
         <p class="local-note">LOCAL WORKSPACE<br />Single-user research environment</p>
     </aside>
     <div class="workspace">
-        <header>Research operations <span class="badge">PHASE 6 / ASSESSMENTS & REPORTS</span></header>
+        <header>Research operations <span class="badge">Local evidence workspace</span></header>
         <main id="main-content">@Body</main>
     </div>
 </div>

@@ -204,9 +204,8 @@ def main() -> None:
                 ).not_to_be_visible()
                 canvas.scroll_into_view_if_needed()
                 center = canvas.bounding_box()
-                page.mouse.click(
-                    center["x"] + center["width"] / 2,
-                    center["y"] + center["height"] / 2,
+                canvas.click(
+                    position={"x": center["width"] / 2, "y": center["height"] / 2}
                 )
                 expect(
                     page.get_by_role(
@@ -327,7 +326,9 @@ def main() -> None:
                 request(route + f"/relationships/{first_edge['id']}")
             )
             assert preserved["evidence"][0]["quote"] == proof["evidence"][0]["quote"]
-            expect_error(lambda: request(route + f"/investigations/{inv}/backups"), 404)
+            expect_error(
+                lambda: request(route + f"/investigations/{inv}/collaboration"), 404
+            )
             print(
                 f"PASS: real 100-node/300-edge graph; Edge render {render_ms}ms, initial load {load_ms}ms; pan/zoom, filters, neighbors, path, evidence review, offline assets, XSS-safe labels, stable reprocessing and restart persistence. Screenshot: .local/phase4-graph.png"
             )

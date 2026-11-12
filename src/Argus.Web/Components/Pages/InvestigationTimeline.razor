@@ -6,10 +6,11 @@
 @inject SourceClient Sources
 @inject IntelligenceApiClient Intelligence
 <PageTitle>ARGUS | Timeline</PageTitle>
+<InvestigationNav Id="Id" />
 <a href="@($"/investigations/{Id}")">Investigation overview</a> · <a href="@($"/investigations/{Id}/map")">Geography</a>
 <p class="eyebrow">CHRONOLOGY / ANALYST REVIEW</p><h1>Investigation timeline</h1>
 <p class="muted">Month and year dates retain their precision. Unknown and relative dates remain unresolved. Edits require renewed approval.</p>
-@if (error is not null) { <p role="alert" class="error">@error</p> }
+@if (error is not null) { <ErrorNotice Message="@error" /> }
 @if (message is not null) { <p role="status" class="success">@message</p> }
 <fieldset class="filters graph-filters" disabled="@(!interactive || busy)" data-timeline-ready="@interactive.ToString().ToLowerInvariant()">
     <label>Review status<select aria-label="Event review status" @bind="status"><option value="APPROVED">Approved</option><option value="PROPOSED">Proposed</option><option value="REJECTED">Rejected</option><option value="">All</option></select></label>
@@ -24,8 +25,8 @@
     <button disabled="@(busy || !sourceId.HasValue)" @onclick="GenerateAsync">Queue date extraction</button>
     <a href="/processing-jobs">Monitor, cancel or retry jobs</a><p>After completion, choose Proposed and refresh. Date mentions suggest evidence; they do not establish that an event occurred.</p>
 </details>
-@if (events is null) { <p role="status">Loading timeline…</p> }
-else
+@if (events is null && error is null) { <p role="status">Loading timeline…</p> }
+else if (events is not null)
 {
     <p>@events.Total events · page @(page)</p>
     @if (events.Total == 0) { <p class="panel">No events match these filters. Create an event or extract source date candidates.</p> }
@@ -111,5 +112,5 @@ else
     private void ToggleEntity(Guid id, bool value) { if (value) { if (!edit.EntityIds.Contains(id)) edit.EntityIds.Add(id); } else edit.EntityIds.Remove(id); }
     private async Task GenerateAsync() => await RunAsync(async () => { var job = await Client.GenerateAsync(sourceId!.Value); message = $"Date extraction queued ({job.Id}). Monitor processing jobs, then refresh Proposed events."; });
     private async Task RunAsync(Func<Task> action)
-    { busy = true; error = null; message = null; try { await action(); } catch (HttpRequestException ex) { error = ex.Message; } catch (TaskCanceledException) { error = "Request timed out. Refresh before retrying."; } finally { busy = false; } }
+    { busy = true; error = null; message = null; try { await action(); } catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); } catch (TaskCanceledException) { error = "Request timed out. Refresh before retrying."; } finally { busy = false; } }
 }

@@ -6,7 +6,7 @@
 <PageTitle>ARGUS | Investigation editor</PageTitle>
 <a href="@(Id.HasValue ? $"/investigations/{Id}" : "/investigations")">Back to workspace</a>
 <h1>@(Id.HasValue ? "Edit investigation" : "New investigation")</h1>
-@if (error is not null) { <p role="alert" class="error">@error</p> }
+@if (error is not null) { <ErrorNotice Message="@error" /> }
 @if (loading) { <p role="status">Loading investigation...</p> }
 else if (ready)
 {

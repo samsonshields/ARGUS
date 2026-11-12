@@ -1,6 +1,6 @@
 # ARGUS development plan
 
-Current scope: Phases 1-6. Phase 7 has not begun.
+Current scope: Phases 1-7 complete. Phase 7 completion gate passed.
 
 ## Phase 1 implementation
 
@@ -346,7 +346,7 @@ entity passages. Regression tests cover exact passages after emoji. A browser te
 was also scoped to distinguish the visible evidence label from its select option. Final
 checks pass without suppressing warnings or bypassing report validation.
 
-Phase 6 completion gate passed. Phase 7 has not been started.
+Phase 6 completion gate passed. Phase 7 was subsequently authorized below.
 
 ## Phase 6 known limits and next steps
 
@@ -363,5 +363,87 @@ Phase 6 completion gate passed. Phase 7 has not been started.
 - The upstream Python test-client warning and existing no-authentication/no-OCR/crash-orphan
   limitations remain. No critical Phase 6 runtime issue is known from the executed checks.
 - Restart API and Web to load the new implementation and apply AssessmentsReports.
-  Await user authorization before any Phase 7 work.
+  Phase 7 was subsequently authorized; its record follows.
 
+
+## Phase 7 implementation
+
+- [x] Re-read specification/architecture and verify SDK, runtimes and Python toolchains.
+- [x] Refine dark workstation styling, context navigation, keyboard focus and mobile wrapping.
+- [x] Add distinct actionable error/loading/empty states and safe network-error wording.
+- [x] Add structured UTC request/job/NLP diagnostics without document/query/parser content.
+- [x] Batch common claim/timeline/location queries and add the WorkspaceQuality indexes.
+- [x] Enforce fixed query budgets with fifty-row integration fixtures.
+- [x] Add the complete fictional Operation Meridian dataset and real-API training loader.
+- [x] Add live workspace backup, checksum manifest and offline safe restore into a new directory.
+- [x] Test malformed archives, traversal, duplicates, symlinks, checksums, original integrity and persistence.
+- [x] Add a complete real-model/API/browser/backup/restore/restart demonstration smoke.
+- [x] Capture/inspect desktop and mobile views; add fictional screenshots/example to README.
+- [x] Add setup, walkthrough, design, quality/recovery and architecture/schema/API documentation.
+- [x] Correct Git ignore rules that hid Infrastructure/Data source and migrations on Windows.
+- [x] Complete source-only/fresh-environment verification and final regression checks.
+
+## Phase 7 final verification
+
+Verified on 2026-11-12 (America/New_York), using .NET SDK 10.0.102,
+ASP.NET/runtime 10.0.2, Python 3.14.6 and installed Microsoft Edge on Windows x64.
+
+- `scripts/verify.ps1 -Full`: passed the Release build, automated suites, formatting,
+  lint, dependency consistency and all six isolated live workflows.
+- Release build: zero warnings/errors. .NET tests: **164 passed** (79 unit,
+  85 integration). Python tests: **58 passed**. Total: **222 passed**, zero failures/skips.
+- Python retains one upstream Starlette/httpx test-client deprecation warning;
+  it is documented and not suppressed.
+- .NET format verification, Ruff lint/format and application JavaScript syntax checks:
+  passed. EF reports no pending model changes; NuGet's transitive audit reports no
+  known vulnerable packages; `pip check` reports no broken requirements.
+- Live regressions passed for import/original preservation, real NLP/review/queue recovery,
+  graph exploration, timeline/offline geography and claims/CommonMark reports.
+- Graph regression with 100 nodes/300 edges: 225 ms render, 820 ms initial load on
+  this machine. Fifty-row integration fixtures enforce bounded query counts for claims,
+  timeline and locations; these timings are observations, not universal guarantees.
+- The complete Meridian workflow passed real ingestion/model proposals, analyst corrections,
+  merge history, 14 active entities, 18 edges (15 proposed/3 reviewed), ten dated events,
+  five locations and five claims with two explicitly unresolved conflicts. It generated
+  an immutable source-backed report and exercised desktop/mobile navigation.
+- The browser downloaded a live workspace backup. Offline CLI restore, a real service
+  restart and comparisons of original bytes/hashes, reviews and reports passed. Malformed
+  archives, missing/tampered originals, traversal, duplicate entries, symlinks and checksum
+  failures are covered by integration tests; existing restore destinations are rejected.
+- Restored browser views passed; an intentional API outage produced an actionable error
+  and reload control without an endless loading state. The 390-pixel layout had no
+  horizontal page overflow. External network requests were blocked during offline workflows.
+- After the final map animation refinement, both the temporal regression and full Meridian
+  smoke passed again. The final Meridian run rendered its graph in 53 ms and completed
+  in 28.7 seconds. The README's six fictional application screenshots were regenerated
+  and inspected, alongside the mobile capture.
+- `scripts/verify_clean_checkout.py --fresh-python` passed tool restore, package restore,
+  Release build, all .NET tests, installation of the locked Python/model environment into
+  a new venv, Python tests and dependency consistency. A subsequent source-only copy
+  also passed. This checks the current publishable working tree, not a remote Git clone.
+- Fixed broad `data/` ignore rules that hid Infrastructure/Data source and all migrations
+  on Windows. Source-only verification explicitly requires the database context. Local
+  databases, originals, environments, logs and secrets remain excluded.
+- `git diff --check`: passed. Test services used isolated ports/temporary data and stopped
+  afterward; existing application instances and normal workspace data were left untouched.
+
+Phase 7 completion gate passed. All seven specified phases are implemented; no additional
+phase or deployment work was started. Source changes remain available for review without
+staging or committing.
+
+## Phase 7 known limits and next steps
+
+- Backup v1 is bounded to 5,000 originals and 512 MiB of database plus original data;
+  individual originals are limited to 100 MiB. Archives are checksummed, not signed or
+  encrypted. Restore trusted archives into a new directory and keep independent copies.
+- Export preparation has a two-minute I/O deadline; SQLite's native synchronous snapshot
+  cannot be forcibly interrupted by that deadline. A hard process crash can leave
+  temporary export/orphan files. See quality-contracts.md for recovery and size details.
+- Windows x64 and installed Edge desktop/mobile emulation were verified. Other operating
+  systems, browser engines and physical mobile devices remain unverified.
+- The existing single-user/loopback, no-authentication, no-OCR and English-model limitations
+  remain. Findings, location profiles and confidence require analyst review; reports preserve
+  their generation-time state rather than updating after later corrections.
+- Restart the API, Web and NLP services to load the changes and apply WorkspaceQuality.
+  Follow setup.md and demo-walkthrough.md for normal use, demonstration and recovery.
+  No critical runtime issue is known from the executed checks.

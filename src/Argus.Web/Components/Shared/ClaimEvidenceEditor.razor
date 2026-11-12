@@ -54,5 +54,5 @@
     });
     private async Task RemoveAsync(Guid id) => await RunAsync(async () => { await Client.RemoveEvidenceAsync(Claim.Claim.Id, id, Claim.Claim.Revision); await Changed.InvokeAsync(); });
     private async Task RunAsync(Func<Task> action)
-    { busy = true; error = null; try { await action(); } catch (HttpRequestException ex) { error = ex.Message; } catch (TaskCanceledException) { error = "Request timed out. Reload before retrying."; } finally { busy = false; } }
+    { busy = true; error = null; try { await action(); } catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); } catch (TaskCanceledException) { error = "Request timed out. Reload before retrying."; } finally { busy = false; } }
 }
