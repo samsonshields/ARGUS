@@ -9,9 +9,13 @@
 @inject IJSRuntime JS
 <PageTitle>ARGUS | Geography</PageTitle>
 <InvestigationNav Id="Id" />
-<a href="@($"/investigations/{Id}")">Investigation overview</a> · <a href="@($"/investigations/{Id}/timeline")">Timeline</a>
-<p class="eyebrow">GEOGRAPHY / REVIEWED LOCATIONS</p><h1>Investigation geography</h1>
-<p class="muted">Only approved locations with selected or verified coordinates appear. Amber circles show an approximate location's uncertainty radius. Purple rings mark events.</p>
+<div class="page-head">
+    <div>
+        <h1>Investigation geography</h1>
+        <p class="lede">Only approved locations with selected or verified coordinates appear. Amber circles show an approximate location's uncertainty radius. Blue rings mark events.</p>
+    </div>
+    <div class="actions"><button disabled="@busy" @onclick="ReloadAsync">Refresh geography</button><button class="primary" disabled="@busy" @onclick="New">Create location profile</button></div>
+</div>
 @if (error is not null) { <ErrorNotice Message="@error" /> }
 @if (message is not null) { <p role="status" class="success">@message</p> }
 <div class="filters graph-filters">
@@ -21,66 +25,94 @@
     <label><input type="checkbox" @bind="unknown" />Include events with unknown dates</label><button disabled="@busy" @onclick="ReloadAsync">Apply map filters</button>
 </div>
 <p class="muted">Date and event type filters apply to event rings. Approved location entities remain visible.</p>
-<div class="actions"><button disabled="@busy" @onclick="New">Create location profile</button><button disabled="@busy" @onclick="ReloadAsync">Refresh geography</button>
-    <button disabled="@(busy || module is null)" @onclick="SaveFocusAsync">Save current geographic focus</button>
-    <button disabled="@(module is null)" @onclick="ToggleTilesAsync">@(online ? "Use offline coordinate grid" : "Load OpenStreetMap basemap (online)")</button></div>
-<p class="muted">The coordinate grid works offline. Loading the optional online basemap sends viewport tile requests to OpenStreetMap. Attribution and browser caching are retained; no tile downloads or geocoding are performed.</p>
-@if (tileError) { <p role="status">Online tiles are unavailable. The coordinate grid and reviewed markers remain usable.</p> }
+<div class="graph-toolbar">
+    @if (data is not null) { <p class="graph-summary">@data.Locations.Count approved mapped locations / @data.Events.Count event markers</p> } else { <span></span> }
+    <div class="tool-group" role="group" aria-label="Map controls">
+        <button disabled="@(busy || module is null)" @onclick="SaveFocusAsync">Save current geographic focus</button>
+        <button disabled="@(module is null)" @onclick="ToggleTilesAsync">@(online ? "Use offline coordinate grid" : "Load OpenStreetMap basemap (online)")</button>
+    </div>
+</div>
+@if (tileError) { <p role="status" class="notice">Online tiles are unavailable. The coordinate grid and reviewed markers remain usable.</p> }
 <div class="map-canvas" @ref="canvas" role="region" aria-label="Investigation map" tabindex="0"></div>
+<ul class="map-legend" aria-label="Map key">
+    <li><svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="5.5" fill="#fafafa" stroke="#fafafa" stroke-width="2" /></svg>Exact location</li>
+    <li><svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="8" fill="rgba(246,183,4,.15)" stroke="#f6b704" stroke-width="1.2" /><circle cx="9" cy="9" r="3.5" fill="#f6b704" /></svg>Approximate location with uncertainty radius</li>
+    <li><svg viewBox="0 0 18 18" aria-hidden="true"><circle cx="9" cy="9" r="7" fill="rgba(100,167,255,.2)" stroke="#64a7ff" stroke-width="2" /></svg>Event at a location</li>
+</ul>
+<p class="muted">The coordinate grid works offline. Loading the optional online basemap sends viewport tile requests to OpenStreetMap. Attribution and browser caching are retained; no tile downloads or geocoding are performed.</p>
 @if (data is null && error is null) { <p role="status">Loading geography…</p> }
 else if (data is not null)
 {
-    <p>@data.Locations.Count approved mapped locations · @data.Events.Count event markers</p>
-    @if (data.Locations.Count == 0) { <p class="panel">No approved locations have known coordinates. Create and cite a location profile, then approve it.</p> }
+    @if (data.Locations.Count == 0) { <div class="empty"><strong>No approved locations have known coordinates</strong>Create and cite a location profile, then approve it.</div> }
+    <div class="filters">
     <label>Choose a mapped record (keyboard accessible)<select aria-label="Choose mapped record" value="@recordChoice" @onchange="ChooseAsync"><option value="">Choose location or event</option>
         @foreach (var l in data.Locations) { <option value="@($"location:{l.Id}")">Location: @l.Name (@l.Precision)</option> }
         @foreach (var e in data.Events) { <option value="@($"event:{e.Id}")">Event: @e.Title · @TemporalDisplay.Date(e)</option> }
     </select></label>
+    </div>
 }
-<section class="panel"><h2>Location review library</h2>
-    @if (locations.Count == 0) { <p>No location profiles yet. Approve a LOCATION entity first in entity review.</p> }
-    @foreach (var l in locations)
-    { <div class="relationship-row"><button disabled="@busy" @onclick="() => SelectLocationAsync(l.Id)">@l.Name</button><span>@l.Status · @l.Precision · @l.Evidence.Count citations</span><a href="@($"/entities/{l.EntityId}")">Entity record</a></div> }
+<div class="review-layout">
+<section aria-labelledby="library-heading">
+    <div class="section-head"><h2 id="library-heading">Location review library</h2><span class="count">@locations.Count profiles</span></div>
+    @if (locations.Count == 0) { <div class="empty">No location profiles yet. Approve a LOCATION entity first in entity review.</div> }
+    else
+    {
+        <div class="records">
+        @foreach (var l in locations)
+        { <div class="relationship-row @(selected?.Id == l.Id ? "selected" : null)" data-status="@l.Status"><div class="record-main"><button class="record-title" disabled="@busy" @onclick="() => SelectLocationAsync(l.Id)">@l.Name</button>
+            <div class="meta"><StatusTag Value="l.Status" /><span>@StatusTag.Humanize(l.Precision.ToString())@(l.UncertaintyMeters is > 0 ? $", ±{l.UncertaintyMeters:0} m" : "")</span><span>@l.Evidence.Count citations</span></div></div>
+            <a href="@($"/entities/{l.EntityId}")">Entity record</a></div> }
+        </div>
+    }
 </section>
+<div class="inspector-column">
+@if (selectedEvent is null && !editing) { <div class="empty inspector-empty"><strong>No record selected</strong>Choose a marker or a location profile to inspect its precision and citations.</div> }
 @if (selectedEvent is not null)
 {
-    <section class="panel"><h2>@selectedEvent.Title</h2><p>@TemporalDisplay.Date(selectedEvent) · @selectedEvent.Type</p><p>@selectedEvent.Description</p>
-    <p>The marker uses its associated location's precision and uncertainty.</p>
-    @foreach (var e in selectedEvent.Evidence) { <figure class="citation"><blockquote>@e.Quote</blockquote><figcaption><a href="@($"/sources/{e.SourceId}")">@e.SourceTitle</a> · snapshot @e.TextHash</figcaption></figure> }
-    <a class="button" href="@($"/investigations/{Id}/timeline?eventId={selectedEvent.Id}")">Open event and review on timeline</a></section>
+    <section class="panel inspector"><h2>@selectedEvent.Title</h2>
+    <div class="meta"><span class="mono">@TemporalDisplay.Date(selectedEvent)</span><span class="tag tag-type">@selectedEvent.Type</span></div>
+    <p>@selectedEvent.Description</p>
+    <p class="muted">The marker uses its associated location's precision and uncertainty.</p>
+    @foreach (var e in selectedEvent.Evidence) { <figure class="citation"><blockquote>@e.Quote</blockquote><figcaption><a href="@($"/sources/{e.SourceId}")">@e.SourceTitle</a><span>snapshot <code>@e.TextHash</code></span></figcaption></figure> }
+    <div class="actions"><a class="button" href="@($"/investigations/{Id}/timeline?eventId={selectedEvent.Id}")">Open event and review on timeline</a></div></section>
 }
 @if (editing)
 {
-    <section class="panel" aria-label="Location inspector"><h2>@(selected is null ? "New location profile" : selected.Name)</h2>
-    <p>Click the map to copy a coordinate into this draft, or enter source-verified coordinates. Review the precision and confirm before saving.</p>
+    <section class="panel inspector" aria-label="Location inspector"><h2>@(selected is null ? "New location profile" : selected.Name)</h2>
+    @if (selected is not null) { <div class="meta"><StatusTag Value="selected.Status" /><span>@StatusTag.Humanize(selected.Precision.ToString())</span><span>@StatusTag.Humanize(selected.Basis.ToString())</span></div> }
+    <p class="muted">Click the map to copy a coordinate into this draft, or enter source-verified coordinates. Review the precision and confirm before saving.</p>
     @if (selected is null)
     {
-        <label>Find approved location entities<input aria-label="Find location entities" @bind="entitySearch" /></label><button disabled="@busy" @onclick="SearchAsync">Find location entities</button>
+        <div class="filters"><label>Find approved location entities<input aria-label="Find location entities" @bind="entitySearch" /></label><button disabled="@busy" @onclick="SearchAsync">Find location entities</button></div>
         <label>Location entity<select aria-label="Location entity" @bind="edit.EntityId"><option value="@Guid.Empty">Choose approved LOCATION entity</option>@foreach (var e in entityChoices) { <option value="@e.Id">@e.Name</option> }</select></label>
         <p class="muted">Search matches include LOCATION entities only. Narrow your search if needed.</p>
     }
-    else { <a href="@($"/entities/{selected.EntityId}")">Open approved entity record</a> }
+    else { <p><a href="@($"/entities/{selected.EntityId}")">Open approved entity record</a></p> }
     <EditForm Model="edit" OnValidSubmit="SaveAsync" FormName="location-editor"><DataAnnotationsValidator /><ValidationSummary />
-        <fieldset disabled="@busy" class="editor" @onchange="MarkDirty">
+        <fieldset disabled="@busy" class="editor grid-2" @onchange="MarkDirty">
         <label>Location precision<InputSelect aria-label="Location precision" @bind-Value="edit.Precision">@foreach (var p in Enum.GetValues<GeoPrecision>()) { <option>@p</option> }</InputSelect></label>
-        <label>Latitude<InputNumber @bind-Value="edit.Latitude" /></label><label>Longitude<InputNumber @bind-Value="edit.Longitude" /></label>
-        <label>Approximate uncertainty radius (metres)<InputNumber @bind-Value="edit.UncertaintyMeters" /></label>
         <label>Coordinate basis<InputSelect aria-label="Coordinate basis" @bind-Value="edit.Basis">@foreach (var b in Enum.GetValues<CoordinateBasis>()) { <option>@b</option> }</InputSelect></label>
+        <label>Latitude<InputNumber @bind-Value="edit.Latitude" /></label><label>Longitude<InputNumber @bind-Value="edit.Longitude" /></label>
+        <label class="span-all">Approximate uncertainty radius (metres)<InputNumber @bind-Value="edit.UncertaintyMeters" /></label>
         <label>Basis and uncertainty notes<InputTextArea @bind-Value="edit.Notes" /></label>
         <label><InputCheckbox @bind-Value="edit.ConfirmCoordinates" />I explicitly selected these coordinates or verified them against the cited source metadata.</label>
         <p class="muted">UNKNOWN requires empty coordinates and radius. APPROXIMATE requires a radius greater than zero. EXACT asserts a precise selected or verified point.</p>
-        <button type="submit">Save location proposal</button><button type="button" @onclick="() => editing = false">Close location editor</button></fieldset>
+        <div class="form-actions"><button class="primary" type="submit">Save location proposal</button><button type="button" @onclick="() => editing = false">Close location editor</button></div></fieldset>
     </EditForm>
     @if (selected is not null)
     {
-        <p>Current review: @selected.Status · @selected.Precision · @selected.Basis</p>
-        @if (dirty) { <p role="status">Save or reload your draft edits before reviewing this location or changing its citations.</p> }
+        @if (dirty) { <p role="status" class="notice">Save or reload your draft edits before reviewing this location or changing its citations.</p> }
         <fieldset class="review-citations" disabled="@dirty"><TemporalCitations @key="selected.Id" InvestigationId="Id" RecordId="selected.Id" Location="true" Revision="selected.Revision" Evidence="selected.Evidence" Changed="RefreshSelectedAsync" /></fieldset>
-        <label><input type="checkbox" @bind="confirm" />I reviewed the location, uncertainty and citations; confirm the selected action.</label>
-        <div class="actions"><button disabled="@(busy || dirty || !confirm)" @onclick='() => ReviewAsync("approve")'>Approve location</button><button disabled="@(busy || dirty || !confirm)" @onclick='() => ReviewAsync("reject")'>Reject location</button><button class="danger" disabled="@(busy || dirty || !confirm)" @onclick='() => ReviewAsync("remove")'>Remove location</button></div>
+        <div class="review-decision">
+            <h3>Review decision</h3>
+            <label><input type="checkbox" @bind="confirm" />I reviewed the location, uncertainty and citations; confirm the selected action.</label>
+            <div class="actions"><button class="primary" disabled="@(busy || dirty || !confirm)" @onclick='() => ReviewAsync("approve")'>Approve location</button><button disabled="@(busy || dirty || !confirm)" @onclick='() => ReviewAsync("reject")'>Reject location</button><button class="danger" disabled="@(busy || dirty || !confirm)" @onclick='() => ReviewAsync("remove")'>Remove location</button></div>
+        </div>
     }
     </section>
 }
+</div>
+</div>
 @code {
     [Parameter] public Guid Id { get; set; }
     private MapResponse? data;

@@ -2,22 +2,38 @@
 @rendermode InteractiveServer
 @inject InvestigationClient Client
 <PageTitle>ARGUS | Investigations</PageTitle>
-<p class="eyebrow">RESEARCH WORKSPACES</p>
-<div class="section-heading"><h1>Investigations</h1><a class="button" href="/investigations/new">New investigation</a></div>
+<div class="page-head">
+    <div>
+        <h1>Investigations</h1>
+        <p class="lede">Each investigation scopes its sources, reviewed findings and reports.</p>
+    </div>
+    <div class="actions"><a class="button primary" href="/investigations/new">New investigation</a></div>
+</div>
 <form @onsubmit="LoadAsync" @onsubmit:preventDefault class="filters">
-    <label>Search<input @bind="search" maxlength="200" placeholder="Title, description or region" /></label>
+    <label>Search<input @bind="search" maxlength="200" placeholder="Title, description or region…" /></label>
     <label>Status<select @bind="status"><option value="">All statuses</option><option>Active</option><option>Archived</option></select></label>
     <button disabled="@loading" type="submit">Apply filters</button>
 </form>
 @if (error is not null) { <ErrorNotice Message="@error" /> }
-@if (loading) { <p role="status">Loading investigations...</p> }
-else if (items.Count == 0 && error is null) { <div class="panel">No investigations match this view.</div> }
-else
+@if (loading) { <p role="status">Loading investigations…</p> }
+else if (items.Count == 0 && error is null) { <div class="empty"><strong>No investigations match this view</strong>Clear the filters, or create a new investigation.</div> }
+else if (items.Count > 0)
 {
-    @foreach (var item in items)
-    {
-        <a class="investigation-row" href="@($"/investigations/{item.Id}")"><strong>@item.Title</strong><span>@(item.Region ?? "Region unspecified") / @item.Status</span></a>
-    }
+    <div class="data-table-wrap">
+        <table class="data-table">
+            <thead><tr><th scope="col">Investigation</th><th scope="col">Region</th><th scope="col">Research scope</th><th scope="col">Status</th><th scope="col">Updated (UTC)</th></tr></thead>
+            <tbody>
+            @foreach (var item in items)
+            {
+                <tr><td><a href="@($"/investigations/{item.Id}")">@item.Title</a></td>
+                    <td>@(item.Region ?? "Region unspecified")</td>
+                    <td class="mono">@(item.StartDate?.ToString("yyyy-MM-dd") ?? "Unknown") to @(item.EndDate?.ToString("yyyy-MM-dd") ?? "Unknown")</td>
+                    <td><StatusTag Value="item.Status" /></td>
+                    <td class="mono">@item.UpdatedAt.ToString("yyyy-MM-dd HH:mm")Z</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
 }
 @code {
     private List<InvestigationResponse> items = [];

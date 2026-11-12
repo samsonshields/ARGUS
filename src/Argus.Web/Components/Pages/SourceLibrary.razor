@@ -5,48 +5,65 @@
 @inject NavigationManager Navigation
 <PageTitle>ARGUS | Source library</PageTitle>
 <InvestigationNav Id="Id" />
-<a href="@($"/investigations/{Id}")">Investigation overview</a>
-<p class="eyebrow">@investigation?.Title / SOURCE LIBRARY</p>
-<h1>Sources</h1>
+<div class="page-head">
+    <div>
+        <h1>Sources</h1>
+        <p class="lede">Original documents are preserved unchanged. Extracted text becomes the snapshot every citation points back to.</p>
+    </div>
+</div>
 @if (error is not null) { <ErrorNotice Message="@error" /> }
 @if (duplicateId.HasValue) { <a href="@($"/sources/{duplicateId}")">Open existing source</a> }
-@if (loading) { <p role="status">Loading sources...</p> }
+@if (loading) { <p role="status">Loading sources…</p> }
 else if (investigation is not null && limits is not null)
 {
-    <section class="panel">
-        <h2>Import a source</h2>
+    <details class="panel" open="@(items.Count == 0)">
+        <summary>Import a source</summary>
         <p class="muted">Text and extractable PDF files, up to @(limits.MaxFileBytes / 1024) KiB. Imports queue background entity processing. Scanned PDFs need OCR, which is not supported.</p>
-        <label for="input-kind">Input method</label>
-        <select id="input-kind" @bind="inputKind" disabled="@importing"><option value="file">Upload file</option><option value="paste">Paste text</option></select>
-        <EditForm Model="metadata" OnValidSubmit="ImportAsync" FormName="source-import" class="editor">
+        <EditForm Model="metadata" OnValidSubmit="ImportAsync" FormName="source-import" class="editor grid-2">
             <DataAnnotationsValidator /><ValidationSummary />
-            <SourceMetadataFields Model="metadata" />
+            <div class="field"><label for="input-kind">Input method</label>
+                <select id="input-kind" @bind="inputKind" disabled="@importing"><option value="file">Upload file</option><option value="paste">Paste text</option></select></div>
             @if (inputKind == "file")
             {
-                <label for="source-file">Document (.txt or .pdf)</label><InputFile id="source-file" OnChange="SelectFile" accept=".txt,.pdf" disabled="@importing" />
-                @if (file is not null) { <p>@file.Name (@file.Size bytes)</p> }
+                <div class="field"><label for="source-file">Document (.txt or .pdf)</label><InputFile id="source-file" OnChange="SelectFile" accept=".txt,.pdf" disabled="@importing" />
+                @if (file is not null) { <p class="muted">@file.Name (@file.Size bytes)</p> }</div>
             }
             else
             {
-                <label for="paste">Source text</label><InputTextArea id="paste" @bind-Value="pastedText" maxlength="2000000" />
+                <div class="field wide"><label for="paste">Source text</label><InputTextArea id="paste" @bind-Value="pastedText" maxlength="2000000" /></div>
             }
-            <button disabled="@importing" type="submit">@(importing ? "Saving original..." : "Import source")</button>
+            <SourceMetadataFields Model="metadata" />
+            <div class="form-actions"><button class="primary" disabled="@importing" type="submit">@(importing ? "Saving original…" : "Import source")</button></div>
         </EditForm>
-    </section>
-    <h2>Source library (@items.Count)</h2>
+    </details>
+    <div class="section-head"><h2>Source library (@items.Count)</h2></div>
     <form @onsubmit="LoadListAsync" @onsubmit:preventDefault class="filters">
         <label>Search title or text<input @bind="search" maxlength="200" /></label>
         <label>Published from<input type="date" @bind="from" /></label>
         <label>Published through<input type="date" @bind="to" /></label>
         <button type="submit" disabled="@searching">Search</button>
     </form>
-    @if (searching) { <p role="status">Searching...</p> }
-    else if (items.Count == 0) { <p class="panel">No sources match this view. Import a document or change the filters.</p> }
-    @foreach (var item in items)
+    @if (searching) { <p role="status">Searching…</p> }
+    else if (items.Count == 0) { <div class="empty"><strong>No sources match this view</strong>Import a document above or change the filters.</div> }
+    else
     {
-        <a class="investigation-row" href="@($"/sources/{item.Id}")"><strong>@item.Title</strong>
-            <span>@item.SourceType / @item.ProcessingStatus / Reliability @item.Reliability / @(item.PublishedAt?.ToString("yyyy-MM-dd") ?? "Publication date unknown")</span></a>
-        @if (item.ProcessingError is not null) { <p class="error">@item.ProcessingError</p> }
+        <div class="data-table-wrap">
+            <table class="data-table">
+                <thead><tr><th scope="col">Source</th><th scope="col">Type</th><th scope="col">Extraction</th><th scope="col">Reliability</th><th scope="col">Published</th></tr></thead>
+                <tbody>
+                @foreach (var item in items)
+                {
+                    <tr><td><a href="@($"/sources/{item.Id}")">@item.Title</a>
+                            @if (item.Publisher is not null) { <div class="muted">@item.Publisher</div> }
+                            @if (item.ProcessingError is not null) { <p class="row-error">@item.ProcessingError</p> }</td>
+                        <td>@item.SourceType</td>
+                        <td><StatusTag Value="item.ProcessingStatus" /></td>
+                        <td><ReliabilityGrade Grade="item.Reliability" Prefix="" /></td>
+                        <td class="mono">@(item.PublishedAt?.ToString("yyyy-MM-dd") ?? "Unknown")</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
     }
 }
 @code {

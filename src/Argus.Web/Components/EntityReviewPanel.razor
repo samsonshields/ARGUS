@@ -1,22 +1,28 @@
 @inject IntelligenceApiClient Client
 <section class="panel">
-    <h2>Entity review</h2>
+    <div class="panel-head"><h2>Entity review</h2></div>
     <p class="muted">Proposed mentions are machine suggestions. Similar names do not establish that two people are the same.</p>
     @if (error is not null) { <p role="alert" class="error">@error</p> }
     @if (success is not null) { <p role="status" class="success">@success</p> }
     <div class="filters"><label>Review status<select @bind="status"><option>PROPOSED</option><option>APPROVED</option><option>REJECTED</option></select></label>
         <button disabled="@busy" @onclick="RefreshAsync">Refresh candidates</button></div>
-    @if (items is null) { <p role="status">Loading candidates...</p> }
+    @if (items is null) { <p role="status">Loading candidates…</p> }
     else
     {
-        @if (items.Total == 0) { <p>No @status.ToLowerInvariant() mentions in this view.</p> }
-        @foreach (var mention in items.Items)
+        @if (items.Total == 0) { <div class="empty">No @status.ToLowerInvariant() mentions in this view.</div> }
+        else
         {
-            <div class="mention-row"><button disabled="@busy" @onclick="() => SelectAsync(mention.Id)">@mention.Text</button>
-                <span>@mention.OriginalType / @mention.Status / @mention.SourceTitle</span>
-                @if (mention.EntityId.HasValue) { <a href="@($"/entities/{mention.EntityId}")">Approved entity</a> }</div>
+            <div class="records">
+            @foreach (var mention in items.Items)
+            {
+                <div class="mention-row @(evidence?.Mention.Id == mention.Id ? "selected" : null)" data-status="@mention.Status">
+                    <div class="record-main"><button class="record-title" disabled="@busy" @onclick="() => SelectAsync(mention.Id)">@mention.Text</button>
+                        <div class="meta"><span class="tag tag-type">@mention.OriginalType</span><StatusTag Value="mention.Status" /><span>@mention.SourceTitle</span></div></div>
+                    @if (mention.EntityId.HasValue) { <a href="@($"/entities/{mention.EntityId}")">Approved entity</a> }</div>
+            }
+            </div>
         }
-        <div class="actions"><button disabled="@(page == 1 || busy)" @onclick="() => PageAsync(-1)">Previous mentions</button>
+        <div class="pager"><button disabled="@(page == 1 || busy)" @onclick="() => PageAsync(-1)">Previous mentions</button>
             <span>Page @(page) / @items.Total mentions</span><button disabled="@(page * items.PageSize >= items.Total || busy)" @onclick="() => PageAsync(1)">Next mentions</button></div>
     }
     <MentionEvidenceView Evidence="evidence" />
@@ -36,8 +42,8 @@
             </InputSelect>
             @if (approval.EntityId.HasValue) { <a href="@($"/entities/{approval.EntityId}")">Inspect or correct the selected entity</a> }
             <p class="muted">Original mention text and model classification are retained when you make corrections.</p>
-            <div class="actions"><button type="submit" disabled="@busy">Approve mention</button>
-                <button type="button" disabled="@busy" @onclick="RejectAsync">Reject mention</button></div>
+            <div class="actions"><button class="primary" type="submit" disabled="@busy">Approve mention</button>
+                <button class="danger" type="button" disabled="@busy" @onclick="RejectAsync">Reject mention</button></div>
         </EditForm>
     }
 </section>

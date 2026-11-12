@@ -1,9 +1,64 @@
-<nav class="investigation-nav" aria-label="Investigation sections">
-    @foreach (var section in sections)
-    { <NavLink href="@($"/investigations/{Id}{section.Path}")" Match="NavLinkMatch.All">@(section.Label)</NavLink> }
-</nav>
+@implements IDisposable
+@inject InvestigationClient Investigations
+@inject NavigationManager Navigation
+<div class="case-head">
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="/investigations">Investigations</a>
+        @if (title is not null && current != "")
+        {
+            <span class="crumb-sep" aria-hidden="true">/</span>
+            <a href="@($"/investigations/{Id}")">@title</a>
+        }
+        @if (status is not null) { <StatusTag Value="status" /> }
+    </nav>
+    <nav class="investigation-nav" aria-label="Investigation sections">
+        @foreach (var tab in sections)
+        {
+            var active = tab.Path == current;
+            <a href="@($"/investigations/{Id}{tab.Path}")" class="@(active ? "active" : null)" aria-current="@(active ? "page" : null)">@tab.Label</a>
+        }
+    </nav>
+</div>
 @code {
     [Parameter] public Guid Id { get; set; }
+    /// <summary>Section path to mark active when the route is outside /investigations/{id}, e.g. "/sources".</summary>
+    [Parameter] public string? Current { get; set; }
+    private string? title, current;
+    private InvestigationStatus? status;
+    private Guid loaded;
     private static readonly (string Path, string Label)[] sections = [("", "Overview"), ("/sources", "Sources"), ("/entities", "Entities"),
         ("/relationships", "Relationships"), ("/graph", "Graph"), ("/timeline", "Timeline"), ("/map", "Geography"), ("/assessments", "Assessments"), ("/reports", "Reports")];
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        current = Current ?? SectionFromUri();
+        if (loaded == Id) return;
+        loaded = Id;
+        try
+        {
+            var item = await Investigations.GetAsync(Id);
+            title = item?.Title; status = item?.Status;
+        }
+        // The page owns error reporting; the header simply omits the case title.
+        catch (HttpRequestException) { title = null; status = null; }
+        catch (TaskCanceledException) { title = null; status = null; }
+    }
+
+    private string SectionFromUri()
+    {
+        var path = Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].TrimEnd('/');
+        var prefix = $"investigations/{Id}";
+        return path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ? path[prefix.Length..] : "";
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        if (Current is not null) return;
+        current = SectionFromUri();
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
 }

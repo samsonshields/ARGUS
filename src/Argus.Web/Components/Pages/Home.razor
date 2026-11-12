@@ -3,35 +3,65 @@
 @inject SourceClient Sources
 @inject IntelligenceApiClient Intelligence
 <PageTitle>ARGUS | Dashboard</PageTitle>
-<h1>Investigation dashboard</h1>
-<p class="muted">Follow source evidence from collection and review through timelines, geographic context and analytical reports.</p>
-@if (error is not null) { <ErrorNotice Message="@error" /><a href="/">Retry</a> }
-else if (items is null) { <p role="status">Loading dashboard...</p> }
+<section class="hero" aria-labelledby="hero-title">
+    <p class="eyebrow"><span class="ring" aria-hidden="true"></span>Local evidence workspace</p>
+    <h1 id="hero-title">Investigation dashboard</h1>
+    <p class="lede">Follow source evidence from collection and review through timelines, geographic context and analytical reports.</p>
+    <div class="actions"><a class="button primary" href="/investigations/new">New investigation</a><a class="button" href="/investigations">All investigations</a></div>
+</section>
+@if (error is not null) { <ErrorNotice Message="@error" /> }
+else if (items is null) { <p role="status">Loading dashboard…</p> }
 else
 {
-    <div class="workspace-summary">
-        <section><h2>Investigations</h2><dl>
-            <div><dt>Total investigations</dt><dd>@items.Count</dd></div>
-            <div><dt>Active workspaces</dt><dd>@items.Count(x => x.Status == InvestigationStatus.Active)</dd></div>
-            <div><dt>Archived investigations</dt><dd>@items.Count(x => x.Status == InvestigationStatus.Archived)</dd></div>
-        </dl><a href="/investigations">Open investigation library</a></section>
-        <section><h2>Evidence and review</h2><dl>
-            <div><dt>Imported sources</dt><dd>@statistics?.Total</dd></div>
-            <div><dt>Text extraction complete / failed</dt><dd>@statistics?.Ready / @statistics?.Failed</dd></div>
-            <div><dt>Approved entities</dt><dd>@intelligence?.ApprovedEntities</dd></div>
-        </dl><p class="muted">@(intelligence?.Proposed ?? 0) entity mentions await analyst review.</p></section>
-        <section><h2>Processing and connections</h2><dl>
-            <div><dt>Active / failed jobs</dt><dd>@intelligence?.PendingJobs / @intelligence?.FailedJobs</dd></div>
-            <div><dt>Proposed relationships</dt><dd>@intelligence?.ProposedRelationships</dd></div>
-            <div><dt>Reviewed relationships</dt><dd>@intelligence?.ApprovedRelationships</dd></div>
-        </dl><a href="/processing-jobs">Open processing monitor</a></section>
+    <h2 id="pipeline-heading" class="section-title">Evidence pipeline</h2>
+    <ol class="pipeline" aria-labelledby="pipeline-heading">
+        <li><span class="stage-name">Sources collected</span><span class="stage-count">@(statistics?.Total ?? 0)</span>
+            <span class="stage-note">Originals preserved with SHA-256</span></li>
+        <li><span class="stage-name">Text extracted</span><span class="stage-count">@(statistics?.Ready ?? 0)</span>
+            <span class="stage-note">@if ((statistics?.Failed ?? 0) > 0) { <StatusTag Value="@("FAILED")" Text="@($"{statistics!.Failed} failed")" /> } else { <text>No extraction failures</text> }</span></li>
+        <li><span class="stage-name">Entities approved</span><span class="stage-count">@(intelligence?.ApprovedEntities ?? 0)</span>
+            <span class="stage-note">@if ((intelligence?.Proposed ?? 0) > 0) { <StatusTag Value="@("PROPOSED")" Text="@($"{intelligence!.Proposed} mentions proposed")" /> } else { <text>No mentions waiting</text> }</span></li>
+        <li><span class="stage-name">Relationships reviewed</span><span class="stage-count">@(intelligence?.ApprovedRelationships ?? 0)</span>
+            <span class="stage-note">@if ((intelligence?.ProposedRelationships ?? 0) > 0) { <StatusTag Value="@("PROPOSED")" Text="@($"{intelligence!.ProposedRelationships} proposed")" /> } else { <text>No proposals waiting</text> }</span></li>
+    </ol>
+
+    <div class="band">
+    <div class="dash-grid">
+        <section aria-labelledby="recent-heading">
+            <div class="section-head"><h2 id="recent-heading">Recently updated</h2><a class="button" href="/investigations">All investigations (@items.Count)</a></div>
+            @if (items.Count == 0)
+            {
+                <div class="empty"><strong>Your workspace is ready</strong>Create an investigation to define its research scope, then import sources.</div>
+            }
+            else
+            {
+                <div class="data-table-wrap">
+                    <table class="data-table">
+                        <thead><tr><th scope="col">Investigation</th><th scope="col">Status</th><th scope="col">Updated (UTC)</th></tr></thead>
+                        <tbody>
+                        @foreach (var item in items.Take(6))
+                        {
+                            <tr><td><a href="@($"/investigations/{item.Id}")">@item.Title</a></td>
+                                <td><StatusTag Value="item.Status" /></td>
+                                <td class="mono">@item.UpdatedAt.ToString("yyyy-MM-dd HH:mm")Z</td></tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+        <section aria-labelledby="queue-heading">
+            <div class="section-head"><h2 id="queue-heading">Analyst queue</h2></div>
+            <ul class="queue">
+                <li class="@((intelligence?.Proposed ?? 0) > 0 ? "waiting" : "clear")"><div>Entity mentions to review<p>Machine suggestions from local NLP</p></div><span class="n">@(intelligence?.Proposed ?? 0)</span></li>
+                <li class="@((intelligence?.ProposedRelationships ?? 0) > 0 ? "waiting" : "clear")"><div>Relationship proposals<p>Co-mentions never self-approve</p></div><span class="n">@(intelligence?.ProposedRelationships ?? 0)</span></li>
+                <li class="@((intelligence?.PendingJobs ?? 0) > 0 ? "waiting" : "clear")"><div>Active processing jobs<p><a href="/processing-jobs">Open processing monitor</a></p></div><span class="n">@(intelligence?.PendingJobs ?? 0)</span></li>
+                <li class="@((intelligence?.FailedJobs ?? 0) > 0 ? "failing" : "clear")"><div>Failed jobs<p>Retry from the processing monitor</p></div><span class="n">@(intelligence?.FailedJobs ?? 0)</span></li>
+            </ul>
+            <p class="muted">Archived: @items.Count(x => x.Status == InvestigationStatus.Archived) of @items.Count investigations.</p>
+        </section>
     </div>
-    <div class="section-heading"><h2>Recently updated</h2><a class="button" href="/investigations/new">New investigation</a></div>
-    @if (items.Count == 0) { <div class="panel"><h3>Your workspace is ready</h3><p>Create an investigation to define its research scope.</p></div> }
-    @foreach (var item in items.Take(5))
-    {
-        <a class="investigation-row" href="@($"/investigations/{item.Id}")"><strong>@item.Title</strong><span>@item.Status / @item.UpdatedAt.ToString("yyyy-MM-dd HH:mm") UTC</span></a>
-    }
+    </div>
 }
 @code {
     private List<InvestigationResponse>? items;

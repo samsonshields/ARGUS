@@ -3,39 +3,56 @@
 @inject SourceClient Sources
 <PageTitle>ARGUS | Source viewer</PageTitle>
 @if (error is not null) { <ErrorNotice Message="@error" /> }
-@if (loading) { <p role="status">Loading source...</p> }
+@if (loading) { <p role="status">Loading source…</p> }
 else if (item is not null)
 {
-    <a href="@($"/investigations/{item.Source.InvestigationId}/sources")">Back to investigation sources</a>
-    <a href="@($"/investigations/{item.Source.InvestigationId}/timeline")">Timeline and date extraction</a>
-    <p class="eyebrow">SOURCE VIEWER / @item.Source.SourceType / @item.Source.ProcessingStatus</p>
-    <h1>@item.Source.Title</h1>
-    <ProcessingPanel @key="(Id, nameof(ProcessingPanel))" SourceId="Id" InvestigationId="item.Source.InvestigationId" Changed="ProcessingChangedAsync" />
-    <EntityReviewPanel @key="(Id, nameof(EntityReviewPanel))" @ref="review" SourceId="Id" InvestigationId="item.Source.InvestigationId" />
+    <InvestigationNav Id="item.Source.InvestigationId" Current="/sources" />
+    <a class="back-link" href="@($"/investigations/{item.Source.InvestigationId}/sources")">Back to investigation sources</a>
+    <div class="page-head">
+        <div>
+            <h1>@item.Source.Title</h1>
+            <div class="meta"><span class="tag tag-type">@item.Source.SourceType</span><StatusTag Value="item.Source.ProcessingStatus" />
+                <ReliabilityGrade Grade="item.Source.Reliability" />@if (item.Source.Publisher is not null) { <span>@item.Source.Publisher</span> }</div>
+        </div>
+        <div class="actions">
+            <a class="button" href="@($"/investigations/{item.Source.InvestigationId}/timeline")">Timeline and date extraction</a>
+            <a class="button" href="@($"/downloads/sources/{Id}")" data-enhance-nav="false">Download original</a>
+        </div>
+    </div>
     @if (Imported) { <p role="status" class="success">Original source saved.</p> }
     @if (success is not null) { <p role="status" class="success">@success</p> }
     @if (item.Source.ProcessingError is not null) { <p role="alert" class="error">@item.Source.ProcessingError</p> }
-    <section class="panel">
-        <dl><dt>Original filename</dt><dd>@item.Source.OriginalFileName</dd>
-            <dt>Size</dt><dd>@item.Source.FileSize bytes</dd>
-            <dt>Retrieved (UTC)</dt><dd>@item.Source.RetrievedAt.ToString("u")</dd>
-            <dt>SHA-256</dt><dd><code>@item.ContentHash</code></dd>
-            <dt>Extraction</dt><dd>@(item.ExtractedAt?.ToString("u") ?? "No successful extraction") / @item.ExtractionVersion</dd></dl>
-        <a class="button" href="@($"/downloads/sources/{Id}")" data-enhance-nav="false">Download original</a>
-        <button disabled="@busy" @onclick="ReextractAsync">@(busy ? "Working..." : "Retry text extraction")</button>
-        <p class="muted">The text-only retry button does not run NLP. Use entity processing above for extraction and NLP. OCR is unavailable.</p>
-    </section>
-    <section class="panel"><h2>Extracted text</h2>
-        @if (item.ExtractedAt.HasValue && item.Source.ProcessingStatus == SourceProcessingStatus.Failed)
-        { <p class="error">The latest retry failed. The text below is from the last successful extraction.</p> }
-        <pre class="source-text">@(string.IsNullOrEmpty(item.ExtractedText) ? "No extracted text is available." : item.ExtractedText)</pre>
-    </section>
-    <h2>Source metadata</h2>
-    <EditForm Model="metadata" OnValidSubmit="SaveAsync" FormName="source-metadata" class="panel editor">
-        <DataAnnotationsValidator /><ValidationSummary />
-        <SourceMetadataFields Model="metadata" />
-        <button type="submit" disabled="@busy">Save metadata</button>
-    </EditForm>
+    <div class="overview-grid">
+        <section aria-labelledby="text-heading">
+            <div class="section-head"><h2 id="text-heading">Extracted text</h2><span class="count">Preserved snapshot</span></div>
+            @if (item.ExtractedAt.HasValue && item.Source.ProcessingStatus == SourceProcessingStatus.Failed)
+            { <p class="error">The latest retry failed. The text below is from the last successful extraction.</p> }
+            <pre class="source-text">@(string.IsNullOrEmpty(item.ExtractedText) ? "No extracted text is available." : item.ExtractedText)</pre>
+        </section>
+        <aside>
+            <section class="panel" aria-labelledby="provenance-heading">
+                <h2 id="provenance-heading">Provenance</h2>
+                <dl class="facts"><dt>Original filename</dt><dd>@item.Source.OriginalFileName</dd>
+                    <dt>Size</dt><dd>@item.Source.FileSize bytes</dd>
+                    <dt>Published</dt><dd class="mono">@(item.Source.PublishedAt?.ToString("yyyy-MM-dd") ?? "Unknown")</dd>
+                    <dt>Retrieved (UTC)</dt><dd class="mono">@item.Source.RetrievedAt.ToString("u")</dd>
+                    <dt>SHA-256</dt><dd><code>@item.ContentHash</code></dd>
+                    <dt>Extraction</dt><dd>@(item.ExtractedAt?.ToString("u") ?? "No successful extraction") / @item.ExtractionVersion</dd></dl>
+                <div class="actions"><button disabled="@busy" @onclick="ReextractAsync">@(busy ? "Working…" : "Retry text extraction")</button></div>
+                <p class="muted">The text-only retry button does not run NLP. Use entity processing below for extraction and NLP. OCR is unavailable.</p>
+            </section>
+        </aside>
+    </div>
+    <EntityReviewPanel @key="(Id, nameof(EntityReviewPanel))" @ref="review" SourceId="Id" InvestigationId="item.Source.InvestigationId" />
+    <ProcessingPanel @key="(Id, nameof(ProcessingPanel))" SourceId="Id" InvestigationId="item.Source.InvestigationId" Changed="ProcessingChangedAsync" />
+    <details class="panel">
+        <summary>Source metadata</summary>
+        <EditForm Model="metadata" OnValidSubmit="SaveAsync" FormName="source-metadata" class="editor grid-2">
+            <DataAnnotationsValidator /><ValidationSummary />
+            <SourceMetadataFields Model="metadata" />
+            <div class="form-actions"><button class="primary" type="submit" disabled="@busy">Save metadata</button></div>
+        </EditForm>
+    </details>
 }
 @code {
     [Parameter] public Guid Id { get; set; }

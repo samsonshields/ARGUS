@@ -3,36 +3,63 @@
 @inject AssessmentApiClient Client
 <PageTitle>ARGUS | Reports</PageTitle>
 <InvestigationNav Id="Id" />
-<a href="@($"/investigations/{Id}")">Investigation overview</a> · <a href="@($"/investigations/{Id}/assessments")">Claims and evidence</a>
-<p class="eyebrow">REPORTS / APPROVED ASSESSMENT SNAPSHOTS</p><h1>Markdown reports</h1>
-<p class="muted">Validate source provenance and original files, then export approved findings. Reports retain confidence, uncertainty, contradictory evidence and analytical limitations. Saved reports preserve approvals at generation time.</p>
+<div class="page-head">
+    <div>
+        <h1>Markdown reports</h1>
+        <p class="lede">Validate source provenance and original files, then export approved findings. Reports retain confidence, uncertainty, contradictory evidence and analytical limitations. Saved reports preserve approvals at generation time.</p>
+    </div>
+</div>
 @if (error is not null) { <ErrorNotice Message="@error" /> }
 @if (message is not null) { <p role="status" class="success">@message</p> }
-<div class="actions" data-report-ready="@interactive.ToString().ToLowerInvariant()"><button disabled="@(busy || !interactive)" @onclick="ValidateAsync">Validate report content</button><button disabled="@busy" @onclick="ReloadAsync">Refresh report history</button></div>
-@if (validation is not null)
-{
-    <section class="panel" aria-label="Report validation"><h2>@(validation.IsValid ? "Validation passed" : "Validation blocked export")</h2>
-    <p>@validation.ClaimCount claims · @validation.EntityCount entities · @validation.EventCount events · @validation.LocationCount locations · @validation.SourceCount sources · @validation.PassageCount distinct passages</p>
-    @foreach (var issue in validation.Errors) { <p class="error">@issue</p> }
-    @foreach (var warning in validation.Warnings) { <p class="contradiction">@warning</p> }
-    </section>
-}
-<label><input type="checkbox" @bind="confirm" />I reviewed the approved content, confidence, contradictions and limitations for this report snapshot.</label>
-<button disabled="@(busy || !interactive || !confirm || validation?.IsValid != true)" @onclick="GenerateAsync">Generate finalized Markdown</button>
-<p class="muted">Generation repeats validation inside its transaction. A prior validation result cannot bypass changes made since it ran.</p>
+<div class="overview-grid">
+<div>
+<section class="panel" aria-labelledby="export-heading">
+    <h2 id="export-heading">Prepare a finalized snapshot</h2>
+    <ol class="workflow export-steps">
+        <li><strong>Validate content</strong><span>Checks approved claims, citations, snapshots and original files.</span></li>
+        <li><strong>Confirm review</strong><span>Record that you reviewed confidence, contradictions and limitations.</span></li>
+        <li><strong>Generate</strong><span>Validation repeats inside the generation transaction.</span></li>
+    </ol>
+    <div class="actions" data-report-ready="@interactive.ToString().ToLowerInvariant()"><button disabled="@(busy || !interactive)" @onclick="ValidateAsync">Validate report content</button><button class="quiet" disabled="@busy" @onclick="ReloadAsync">Refresh report history</button></div>
+    @if (validation is not null)
+    {
+        <section class="validation @(validation.IsValid ? "is-valid" : "is-blocked")" aria-label="Report validation"><h3>@(validation.IsValid ? "Validation passed" : "Validation blocked export")</h3>
+        <dl class="facts validation-counts">
+            <dt>Claims</dt><dd>@validation.ClaimCount</dd><dt>Entities</dt><dd>@validation.EntityCount</dd><dt>Events</dt><dd>@validation.EventCount</dd>
+            <dt>Locations</dt><dd>@validation.LocationCount</dd><dt>Sources</dt><dd>@validation.SourceCount</dd><dt>Distinct passages</dt><dd>@validation.PassageCount</dd>
+        </dl>
+        @foreach (var issue in validation.Errors) { <p class="error">@issue</p> }
+        @foreach (var warning in validation.Warnings) { <p class="notice">@warning</p> }
+        </section>
+    }
+    <label class="check-gap"><input type="checkbox" @bind="confirm" />I reviewed the approved content, confidence, contradictions and limitations for this report snapshot.</label>
+    <div class="actions"><button class="primary" disabled="@(busy || !interactive || !confirm || validation?.IsValid != true)" @onclick="GenerateAsync">Generate finalized Markdown</button></div>
+    <p class="muted">Generation repeats validation inside its transaction. A prior validation result cannot bypass changes made since it ran.</p>
+</section>
+</div>
+<aside>
 @if (items is null && error is null) { <p role="status">Loading report history…</p> }
 else if (items is not null)
 {
-    <h2>Saved reports</h2>
-    @if (items.Total == 0) { <p>No reports generated yet. Approve an evidence-backed claim, then validate the report content to begin.</p> }
-    @foreach (var item in items.Items)
-    { <div class="relationship-row"><button disabled="@busy" @onclick="() => SelectAsync(item.Id)">@item.GeneratedAt.ToString("u")</button><a href="@($"/downloads/reports/{item.Id}")" data-enhance-nav="false">Download Markdown</a><span>@item.FileName</span></div> }
-    <div class="actions"><button disabled="@(busy || page <= 1)" @onclick="() => PageAsync(-1)">Previous reports</button><button disabled="@(busy || page * 20 >= items.Total)" @onclick="() => PageAsync(1)">Next reports</button></div>
+    <div class="section-head"><h2>Saved reports</h2><span class="count">@items.Total snapshots</span></div>
+    @if (items.Total == 0) { <div class="empty"><strong>No reports generated yet</strong>Approve an evidence-backed claim, then validate the report content to begin.</div> }
+    else
+    {
+        <div class="records">
+        @foreach (var item in items.Items)
+        { <div class="relationship-row @(selected?.Report.Id == item.Id ? "selected" : null)" data-status="APPROVED"><div class="record-main"><button class="record-title mono-title" disabled="@busy" @onclick="() => SelectAsync(item.Id)">@item.GeneratedAt.ToString("u")</button>
+            <div class="meta"><span>@item.FileName</span></div></div><a href="@($"/downloads/reports/{item.Id}")" data-enhance-nav="false">Download Markdown</a></div> }
+        </div>
+    }
+    <div class="pager"><button disabled="@(busy || page <= 1)" @onclick="() => PageAsync(-1)">Previous reports</button><button disabled="@(busy || page * 20 >= items.Total)" @onclick="() => PageAsync(1)">Next reports</button></div>
 }
+</aside>
+</div>
 @if (selected is not null)
 {
-    <section class="panel"><h2>Report snapshot</h2><p>@selected.Report.GeneratedAt.ToString("u") · <a href="@($"/downloads/reports/{selected.Report.Id}")" data-enhance-nav="false">Download selected Markdown</a></p>
-    <p>SHA-256: <code>@selected.Report.ContentHash</code></p><p>This snapshot is immutable. Generate a new report to include later corrections.</p>
+    <section class="panel"><div class="panel-head"><h2>Report snapshot</h2><a class="button" href="@($"/downloads/reports/{selected.Report.Id}")" data-enhance-nav="false">Download selected Markdown</a></div>
+    <dl class="facts"><dt>Generated (UTC)</dt><dd class="mono">@selected.Report.GeneratedAt.ToString("u")</dd><dt>SHA-256</dt><dd><code>@selected.Report.ContentHash</code></dd></dl>
+    <p class="muted">This snapshot is immutable. Generate a new report to include later corrections.</p>
     <pre class="source-text report-markdown" aria-label="Markdown report preview">@selected.Markdown</pre></section>
 }
 @code {

@@ -1,0 +1,24 @@
+@* Review-state vocabulary shared with the graph: dashed amber = machine proposed,
+   solid green = analyst reviewed, muted = rejected or archived, red = failed. *@
+<span class="tag @Tone">@Label</span>
+@code {
+    [Parameter, EditorRequired] public object? Value { get; set; }
+    [Parameter] public string? Text { get; set; }
+
+    private string Label => Text ?? Humanize(Value?.ToString());
+
+    private string Tone => Value?.ToString() switch
+    {
+        "PROPOSED" or "PENDING" or "RUNNING" or "Pending" or "Processing" => "tag-proposed",
+        "APPROVED" or "COMPLETED" or "Ready" or "Active" => "tag-reviewed",
+        "FAILED" or "Failed" => "tag-alert",
+        _ => "tag-muted"
+    };
+
+    internal static string Humanize(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return "Unknown";
+        var words = value.Replace('_', ' ').ToLowerInvariant();
+        return char.ToUpperInvariant(words[0]) + words[1..];
+    }
+}

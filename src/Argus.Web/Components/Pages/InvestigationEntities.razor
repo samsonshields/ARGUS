@@ -4,24 +4,33 @@
 @inject InvestigationClient Investigations
 <PageTitle>ARGUS | Entities</PageTitle>
 <InvestigationNav Id="Id" />
-<a href="@($"/investigations/{Id}")">Investigation overview</a>
-<a href="@($"/investigations/{Id}/graph")">Relationship graph</a>
-<a href="@($"/investigations/{Id}/relationships")">Relationship review</a>
-<p class="eyebrow">@investigation?.Title</p><h1>Entities and review</h1>
+<div class="page-head">
+    <div>
+        <h1>Entities and review</h1>
+        <p class="lede">People, organizations and places enter the investigation only after an analyst approves a source mention.</p>
+    </div>
+</div>
 @if (error is not null) { <ErrorNotice Message="@error" /> }
-@if (investigation is null && error is null) { <p role="status">Loading investigation?</p> }
+@if (investigation is null && error is null) { <p role="status">Loading investigation…</p> }
 else if (investigation is not null)
 {
     <EntityReviewPanel @key="Id" InvestigationId="Id" Reviewed="LoadAsync" />
-    <h2>Approved entities</h2>
+    <div class="section-head"><h2>Approved entities</h2>@if (items is not null) { <span class="count">@items.Total total</span> }</div>
     <form @onsubmit="SearchAsync" @onsubmit:preventDefault class="filters"><label>Canonical name<input @bind="search" maxlength="200" /></label><button type="submit">Search entities</button></form>
-    @if (items is null && error is null) { <p role="status">Loading entities...</p> }
+    @if (items is null && error is null) { <p role="status">Loading entities…</p> }
     else if (items is not null)
     {
-        @if (items.Total == 0) { <p class="panel">No approved entities match this view.</p> }
-        @foreach (var entity in items.Items)
-        { <a class="investigation-row" href="@($"/entities/{entity.Id}")"><strong>@entity.Name</strong><span>@entity.Type / @entity.MentionCount approved mentions</span></a> }
-        <div class="actions"><button disabled="@(page == 1)" @onclick="() => PageAsync(-1)">Previous entities</button><span>Page @(page) / @items.Total entities</span>
+        @if (items.Total == 0) { <div class="empty"><strong>No approved entities match this view</strong>Approve proposed mentions above, or clear the search.</div> }
+        else
+        {
+            <div class="data-table-wrap"><table class="data-table">
+                <thead><tr><th scope="col">Canonical name</th><th scope="col">Classification</th><th scope="col" class="num">Approved mentions</th></tr></thead>
+                <tbody>
+                @foreach (var entity in items.Items)
+                { <tr><td><a href="@($"/entities/{entity.Id}")">@entity.Name</a></td><td><span class="tag tag-type">@entity.Type</span></td><td class="num">@entity.MentionCount</td></tr> }
+                </tbody></table></div>
+        }
+        <div class="pager"><button disabled="@(page == 1)" @onclick="() => PageAsync(-1)">Previous entities</button><span>Page @(page) / @items.Total entities</span>
             <button disabled="@(page * items.PageSize >= items.Total)" @onclick="() => PageAsync(1)">Next entities</button></div>
     }
 }

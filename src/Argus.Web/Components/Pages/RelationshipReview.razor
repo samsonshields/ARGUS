@@ -3,28 +3,44 @@
 @inject GraphApiClient Client
 <PageTitle>ARGUS | Relationship review</PageTitle>
 <InvestigationNav Id="Id" />
-<a href="@($"/investigations/{Id}")">Investigation overview</a> / <a href="@($"/investigations/{Id}/graph")">Relationship graph</a>
-<h1>Relationship review</h1>
-<p class="muted">Approve entity mentions first, then generate sentence co-mention proposals. No relationship is automatically approved.</p>
+<div class="page-head">
+    <div>
+        <h1>Relationship review</h1>
+        <p class="lede">Approve entity mentions first, then generate sentence co-mention proposals. No relationship is automatically approved.</p>
+    </div>
+    <div class="actions"><a class="button quiet" href="/processing-jobs">Monitor background jobs</a><button class="primary" disabled="@busy" @onclick="GenerateAsync">Generate co-mention candidates</button></div>
+</div>
 @if (error is not null) { <ErrorNotice Message="@error" /> }
-@if (message is not null) { <p role="status">@message</p> }
-<div class="actions"><button disabled="@busy" @onclick="GenerateAsync">Generate co-mention candidates</button><a href="/processing-jobs">Monitor background jobs</a></div>
+@if (message is not null) { <p role="status" class="notice">@message</p> }
 <div class="filters"><label>Review status<select @bind="status"><option value="">All statuses</option><option>PROPOSED</option><option>APPROVED</option><option>REJECTED</option></select></label>
     <label>Relationship type<select @bind="type"><option value="">All types</option>@foreach (var item in Enum.GetValues<RelationshipType>()) { <option>@item</option> }</select></label>
     <button disabled="@busy" @onclick="RefreshAsync">Refresh relationships</button></div>
-@if (items is null && error is null) { <p role="status">Loading relationships...</p> }
+<div class="review-layout">
+<div>
+@if (items is null && error is null) { <p role="status">Loading relationships…</p> }
 else if (items is not null)
 {
-    @if (items.Total == 0) { <p class="panel">No relationships match this view. Proposals require two different approved entities in one sentence.</p> }
-    @foreach (var relationship in items.Items)
+    @if (items.Total == 0) { <div class="empty"><strong>No relationships match this view</strong>Proposals require two different approved entities in one sentence.</div> }
+    else
     {
-        <div class="relationship-row"><button disabled="@busy" @onclick="() => selected = relationship.Id">@relationship.SourceName / @relationship.TargetName</button>
-            <span>@relationship.Type / @relationship.Status / @relationship.ApprovedEvidenceCount reviewed passages / @relationship.ProposedEvidenceCount pending</span></div>
+        <div class="records">
+        @foreach (var relationship in items.Items)
+        {
+            <div class="relationship-row @(selected == relationship.Id ? "selected" : null)" data-status="@relationship.Status">
+                <div class="record-main"><button class="record-title" disabled="@busy" @onclick="() => selected = relationship.Id">@relationship.SourceName / @relationship.TargetName</button>
+                <div class="meta"><span class="tag tag-type">@relationship.Type</span><StatusTag Value="relationship.Status" /><span>@relationship.ApprovedEvidenceCount reviewed passages</span><span>@relationship.ProposedEvidenceCount pending</span></div></div></div>
+        }
+        </div>
     }
-    <div class="actions"><button disabled="@(busy || page == 1)" @onclick="() => PageAsync(-1)">Previous relationships</button><span>Page @(page) / @items.Total relationships</span>
+    <div class="pager"><button disabled="@(busy || page == 1)" @onclick="() => PageAsync(-1)">Previous relationships</button><span>Page @(page) / @items.Total relationships</span>
         <button disabled="@(busy || page * items.PageSize >= items.Total)" @onclick="() => PageAsync(1)">Next relationships</button></div>
 }
+</div>
+<div class="inspector-column">
+@if (selected is null) { <div class="empty inspector-empty"><strong>No relationship selected</strong>Choose a relationship to read its cited passages and record your review.</div> }
 <RelationshipInspector Id="selected" Reviewed="LoadAsync" />
+</div>
+</div>
 @code {
     [Parameter] public Guid Id { get; set; }
     private PageResult<RelationshipSummary>? items;

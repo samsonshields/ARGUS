@@ -5,14 +5,14 @@
 @foreach (var citation in Evidence)
 {
     <figure class="citation"><blockquote>@citation.Quote</blockquote>
-        <figcaption><a href="@($"/sources/{citation.SourceId}")">@citation.SourceTitle</a> · preserved snapshot · UTF-16 @citation.Start–@citation.End
+        <figcaption><a href="@($"/sources/{citation.SourceId}")">@citation.SourceTitle</a><span>Preserved snapshot</span><span class="mono">UTF-16 @citation.Start–@citation.End</span>
             <details><summary>Snapshot hash</summary><code>@citation.TextHash</code></details>
         </figcaption>
-        <button disabled="@busy" @onclick="() => RemoveAsync(citation.Id)">Remove citation</button>
+        <div class="actions"><button class="danger" disabled="@busy" @onclick="() => RemoveAsync(citation.Id)">Remove citation</button></div>
     </figure>
 }
 @if (Evidence.Count == 0) { <p class="muted">Add a source passage before approval.</p> }
-<details><summary>Add a source passage</summary>
+<details class="disclosure"><summary>Add a source passage</summary>
     <label>Source <select aria-label="Citation source" @bind="sourceId" @bind:after="LoadAsync"><option value="">Choose source</option>
         @foreach (var source in sources) { <option value="@source.Id">@source.Title</option> }
     </select></label>
@@ -20,8 +20,8 @@
     {
         @foreach (var passage in passages.Items)
         { <div class="citation"><pre class="passage">@passage.Quote</pre><button disabled="@busy" @onclick="() => AddAsync(passage)">Cite passage @passage.Start–@passage.End</button></div> }
-        <button disabled="@(page <= 1 || busy)" @onclick="() => ChangePageAsync(-1)">Previous passages</button>
-        <button disabled="@(page * 10 >= passages.Total || busy)" @onclick="() => ChangePageAsync(1)">Next passages</button>
+        <div class="pager"><button disabled="@(page <= 1 || busy)" @onclick="() => ChangePageAsync(-1)">Previous passages</button>
+        <button disabled="@(page * 10 >= passages.Total || busy)" @onclick="() => ChangePageAsync(1)">Next passages</button></div>
     }
 </details>
 @code {

@@ -4,43 +4,57 @@
 @inject NavigationManager Navigation
 <PageTitle>ARGUS | Investigation overview</PageTitle>
 <InvestigationNav Id="Id" />
-<a href="/investigations">All investigations</a>
 @if (error is not null) { <ErrorNotice Message="@error" /> }
-@if (loading) { <p role="status">Loading investigation...</p> }
+@if (loading) { <p role="status">Loading investigation…</p> }
 else if (item is not null)
 {
     @if (Saved) { <p role="status" class="success">Investigation saved.</p> }
-    <p class="eyebrow">INVESTIGATION OVERVIEW / @item.Status</p>
-    <h1>@item.Title</h1>
-    <div class="panel">
-        <p class="description">@(string.IsNullOrEmpty(item.Description) ? "No description provided." : item.Description)</p>
-        <dl><dt>Region</dt><dd>@(item.Region ?? "Unspecified")</dd>
-            <dt>Research scope</dt><dd>@(item.StartDate?.ToString("yyyy-MM-dd") ?? "Unknown") / @(item.EndDate?.ToString("yyyy-MM-dd") ?? "Unknown")</dd>
-            <dt>Created (UTC)</dt><dd>@item.CreatedAt.ToString("u")</dd>
-            <dt>Updated (UTC)</dt><dd>@item.UpdatedAt.ToString("u")</dd>
-        </dl>
-        <div class="actions">
-        <a class="button" href="@($"/investigations/{Id}/edit")">Edit details / archive</a>
-        <a class="button" href="@($"/investigations/{Id}/sources")">Source library</a>
-        <a class="button" href="@($"/investigations/{Id}/entities")">Entities and review</a>
-        <a class="button" href="@($"/investigations/{Id}/relationships")">Relationship review</a>
-        <a class="button" href="@($"/investigations/{Id}/graph")">Relationship graph</a>
-        <a class="button" href="@($"/investigations/{Id}/timeline")">Timeline and event review</a>
-        <a class="button" href="@($"/investigations/{Id}/map")">Geography and locations</a>
-        <a class="button" href="@($"/investigations/{Id}/assessments")">Assessments and claims</a>
-        <a class="button" href="@($"/investigations/{Id}/reports")">Markdown reports</a>
-        </div>
+    <div class="page-head">
+        <div><h1>@item.Title</h1></div>
+        <div class="actions"><a class="button" href="@($"/investigations/{Id}/edit")">Edit details / archive</a>
+            <a class="button primary" href="@($"/investigations/{Id}/sources")">Source library</a></div>
     </div>
-    <section class="panel danger-zone"><h2>Delete investigation</h2>
-    <p class="muted">Investigations with preserved sources cannot be deleted. Archive them to retain their evidence.</p>
-    @if (!confirming) { <button class="danger" @onclick="() => confirming = true">Delete...</button> }
-    else
-    {
-        <p>This permanently removes <strong>@(item.Title)</strong>. This action cannot be undone.</p>
-        <button class="danger" disabled="@deleting" @onclick="DeleteAsync">Confirm permanent deletion</button>
-        <button disabled="@deleting" @onclick="() => confirming = false">Cancel</button>
-    }
-    </section>
+    <div class="overview-grid">
+        <div>
+            <section class="panel" aria-label="Investigation summary">
+                <p class="description">@(string.IsNullOrEmpty(item.Description) ? "No description provided." : item.Description)</p>
+            </section>
+            <h2 id="workflow-heading">Analytic workflow</h2>
+            <ol class="workflow" aria-labelledby="workflow-heading">
+                <li><a href="@($"/investigations/{Id}/sources")">Sources</a><span>Import originals; text is extracted and preserved as a snapshot.</span></li>
+                <li><a href="@($"/investigations/{Id}/entities")">Entities and review</a><span>Approve, correct or reject machine-proposed mentions.</span></li>
+                <li><a href="@($"/investigations/{Id}/relationships")">Relationship review</a><span>Substantiate co-mention proposals with cited passages.</span></li>
+                <li><a href="@($"/investigations/{Id}/graph")">Relationship graph</a><span>Inspect structure, paths and centrality across reviewed links.</span></li>
+                <li><a href="@($"/investigations/{Id}/timeline")">Timeline and event review</a><span>Order events while keeping month, year and unknown precision.</span></li>
+                <li><a href="@($"/investigations/{Id}/map")">Geography and locations</a><span>Place approved locations with explicit uncertainty radii.</span></li>
+                <li><a href="@($"/investigations/{Id}/assessments")">Assessments and claims</a><span>Weigh supporting and contradicting evidence; record confidence.</span></li>
+                <li><a href="@($"/investigations/{Id}/reports")">Markdown reports</a><span>Export immutable, source-referenced report snapshots.</span></li>
+            </ol>
+        </div>
+        <aside>
+            <section class="panel" aria-labelledby="facts-heading">
+                <h2 id="facts-heading">Case record</h2>
+                <dl class="facts">
+                    <dt>Status</dt><dd><StatusTag Value="item.Status" /></dd>
+                    <dt>Region</dt><dd>@(item.Region ?? "Unspecified")</dd>
+                    <dt>Research scope</dt><dd class="mono">@(item.StartDate?.ToString("yyyy-MM-dd") ?? "Unknown") to @(item.EndDate?.ToString("yyyy-MM-dd") ?? "Unknown")</dd>
+                    <dt>Created (UTC)</dt><dd class="mono">@item.CreatedAt.ToString("u")</dd>
+                    <dt>Updated (UTC)</dt><dd class="mono">@item.UpdatedAt.ToString("u")</dd>
+                    <dt>Record ID</dt><dd><code>@item.Id</code></dd>
+                </dl>
+            </section>
+            <section class="panel danger-zone"><h2>Delete investigation</h2>
+            <p class="muted">Investigations with preserved sources cannot be deleted. Archive them to retain their evidence.</p>
+            @if (!confirming) { <button class="danger" @onclick="() => confirming = true">Delete…</button> }
+            else
+            {
+                <p>This permanently removes <strong>@(item.Title)</strong>. This action cannot be undone.</p>
+                <div class="actions"><button class="danger" disabled="@deleting" @onclick="DeleteAsync">Confirm permanent deletion</button>
+                    <button disabled="@deleting" @onclick="() => confirming = false">Cancel</button></div>
+            }
+            </section>
+        </aside>
+    </div>
 }
 @code {
     [Parameter] public Guid Id { get; set; }

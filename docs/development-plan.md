@@ -447,3 +447,21 @@ staging or committing.
 - Restart the API, Web and NLP services to load the changes and apply WorkspaceQuality.
   Follow setup.md and demo-walkthrough.md for normal use, demonstration and recovery.
   No critical runtime issue is known from the executed checks.
+
+## Post-Phase 7 interface redesign
+
+Visual and interaction redesign of Argus.Web only; no API, Core, schema or migration change.
+Second pass restyled the first redesign to a dark "command console" system (top navigation,
+inset bands, stat cards, corner-bracket frames, IBM Plex Sans). See design.md.
+
+- [x] Single token-based app.css; vendor IBM Plex Sans and Source Code Pro (OFL) locally.
+- [x] Top navigation, footer, configurable marking strip (`Workstation:Marking`) and UTC clock.
+- [x] Shared status, confidence and reliability components using one review-state language.
+- [x] List/inspector layouts for relationships, timeline, geography and assessments; tables for libraries.
+- [x] Align graph and map rendering colors with the legend and tokens; regenerate screenshots.
+
+Verification (`scripts/verify.ps1 -Full`): zero build warnings/errors; 164 .NET tests
+(79 unit, 85 integration) and 58 Python tests passed; dotnet format, ruff and pip check clean;
+all six smoke suites passed, including the mobile no-overflow check and the
+zero-external-request assertion. Accessible names, labels and smoke-test hooks were preserved.
+Other browser engines and physical devices remain unverified.

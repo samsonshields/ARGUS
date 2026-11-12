@@ -1,0 +1,14 @@
+@* Analyst confidence uses ICD 203 wording; the three bars are a reading aid, not a probability. *@
+<span class="confidence" data-level="@Level">
+    <span class="confidence-bars" aria-hidden="true"><i></i><i></i><i></i></span>
+    @Label
+</span>
+@code {
+    [Parameter, EditorRequired] public ConfidenceLevel Level { get; set; }
+
+    private string Label => Level switch
+    {
+        ConfidenceLevel.INSUFFICIENT_INFORMATION => "Insufficient information",
+        _ => $"{StatusTag.Humanize(Level.ToString())} confidence"
+    };
+}

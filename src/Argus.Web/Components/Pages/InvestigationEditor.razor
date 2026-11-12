@@ -4,21 +4,26 @@
 @inject InvestigationClient Client
 @inject NavigationManager Navigation
 <PageTitle>ARGUS | Investigation editor</PageTitle>
-<a href="@(Id.HasValue ? $"/investigations/{Id}" : "/investigations")">Back to workspace</a>
-<h1>@(Id.HasValue ? "Edit investigation" : "New investigation")</h1>
+<a class="back-link" href="@(Id.HasValue ? $"/investigations/{Id}" : "/investigations")">Back to workspace</a>
+<div class="page-head">
+    <div>
+        <h1>@(Id.HasValue ? "Edit investigation" : "New investigation")</h1>
+        <p class="lede">The title, region and scope dates frame what the sources in this investigation are expected to cover.</p>
+    </div>
+</div>
 @if (error is not null) { <ErrorNotice Message="@error" /> }
-@if (loading) { <p role="status">Loading investigation...</p> }
+@if (loading) { <p role="status">Loading investigation…</p> }
 else if (ready)
 {
-    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="investigation" class="panel editor">
+    <EditForm Model="model" OnValidSubmit="SaveAsync" FormName="investigation" class="panel editor grid-2">
         <DataAnnotationsValidator /><ValidationSummary />
-        <label for="title">Title</label><InputText id="title" @bind-Value="model.Title" maxlength="200" /><ValidationMessage For="() => model.Title" />
-        <label for="description">Description</label><InputTextArea id="description" @bind-Value="model.Description" maxlength="5000" />
-        <label for="region">Region (optional)</label><InputText id="region" @bind-Value="model.Region" maxlength="200" />
-        <label for="status">Status</label><InputSelect id="status" @bind-Value="model.Status"><option value="Active">Active</option><option value="Archived">Archived</option></InputSelect>
-        <label for="start">Scope start date (optional)</label><InputDate id="start" @bind-Value="model.StartDate" />
-        <label for="end">Scope end date (optional)</label><InputDate id="end" @bind-Value="model.EndDate" /><ValidationMessage For="() => model.EndDate" />
-        <button disabled="@saving" type="submit">@(saving ? "Saving..." : "Save investigation")</button>
+        <div class="field wide"><label for="title">Title</label><InputText id="title" @bind-Value="model.Title" maxlength="200" /><ValidationMessage For="() => model.Title" /></div>
+        <div class="field wide"><label for="description">Description</label><InputTextArea id="description" @bind-Value="model.Description" maxlength="5000" /></div>
+        <div class="field"><label for="region">Region (optional)</label><InputText id="region" @bind-Value="model.Region" maxlength="200" /></div>
+        <div class="field"><label for="status">Status</label><InputSelect id="status" @bind-Value="model.Status"><option value="Active">Active</option><option value="Archived">Archived</option></InputSelect></div>
+        <div class="field"><label for="start">Scope start date (optional)</label><InputDate id="start" @bind-Value="model.StartDate" /></div>
+        <div class="field"><label for="end">Scope end date (optional)</label><InputDate id="end" @bind-Value="model.EndDate" /><ValidationMessage For="() => model.EndDate" /></div>
+        <div class="form-actions"><button class="primary" disabled="@saving" type="submit">@(saving ? "Saving…" : "Save investigation")</button></div>
     </EditForm>
 }
 @code {

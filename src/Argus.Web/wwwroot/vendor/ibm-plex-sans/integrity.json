@@ -1,0 +1,7 @@
+{
+  "package": "@fontsource-variable/ibm-plex-sans",
+  "version": "5.2.8",
+  "source": "https://cdn.jsdelivr.net/npm/@fontsource-variable/ibm-plex-sans@5.2.8/files/ibm-plex-sans-latin-wght-normal.woff2",
+  "license": "SIL Open Font License 1.1",
+  "woff2Sha256": "e2291e842cf5af167122a22881a740c7f2dda7716f1e8cd76680264f4a859470"
+}

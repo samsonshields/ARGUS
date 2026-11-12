@@ -1,0 +1,15 @@
+@* Admiralty-style source grade. It describes the source, never an individual claim. *@
+<span class="grade-label">@Prefix <abbr class="grade" title="@Description">@Grade</abbr></span>
+@code {
+    [Parameter, EditorRequired] public SourceReliability Grade { get; set; }
+    [Parameter] public string Prefix { get; set; } = "Reliability";
+
+    private string Description => Grade switch
+    {
+        SourceReliability.A => "A: generally reliable (manual assessment)",
+        SourceReliability.B => "B: usually reliable (manual assessment)",
+        SourceReliability.C => "C: mixed or uncertain reliability (manual assessment)",
+        SourceReliability.D => "D: frequently unreliable (manual assessment)",
+        _ => "E: insufficient information to grade"
+    };
+}

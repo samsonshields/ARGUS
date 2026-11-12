@@ -4,30 +4,50 @@
 @inject NavigationManager Navigation
 <PageTitle>ARGUS | Entity evidence</PageTitle>
 @if (error is not null) { <ErrorNotice Message="@error" /> }
-@if (entity is null && error is null) { <p role="status">Loading entity?</p> }
+@if (entity is null && error is null) { <p role="status">Loading entity…</p> }
 else if (entity is not null)
 {
-    <a href="@($"/investigations/{entity.InvestigationId}/entities")">Investigation entities and review</a>
-    <a href="@($"/investigations/{entity.InvestigationId}/graph")">Investigation graph</a>
-    <a href="@($"/investigations/{entity.InvestigationId}/map")">Investigation geography</a>
-    <a href="@($"/investigations/{entity.InvestigationId}/timeline")">Investigation timeline</a>
-    <p class="eyebrow">ANALYST-APPROVED ENTITY</p><h1>@entity.Name</h1>
-    <p>@entity.Type / @entity.MentionCount approved mentions</p>
+    <InvestigationNav Id="entity.InvestigationId" Current="/entities" />
+    <a class="back-link" href="@($"/investigations/{entity.InvestigationId}/entities")">Investigation entities and review</a>
+    <div class="page-head">
+        <div>
+            <h1>@entity.Name</h1>
+            <div class="meta"><span class="tag tag-type">@entity.Type</span><StatusTag Value="ReviewStatus.APPROVED" Text="Analyst approved" />
+                <span>@entity.MentionCount approved mentions</span>
+                <span>Known aliases: @(entity.Aliases.Count == 0 ? "None" : string.Join(", ", entity.Aliases))</span></div>
+        </div>
+    </div>
     @if (success is not null) { <p role="status" class="success">@success</p> }
     @if (entity.MergedIntoId.HasValue)
     { <p>This entity was merged. <a href="@($"/entities/{entity.MergedIntoId}")">Open the retained entity</a>.</p> }
     else
     {
+        <div class="overview-grid">
+        <div>
+        <h2>Source mentions</h2>
+        @if (mentions is not null)
+        {
+            <div class="records">
+            @foreach (var mention in mentions.Items)
+            { <div class="mention-row @(evidence?.Mention.Id == mention.Id ? "selected" : null)" data-status="APPROVED"><div class="record-main"><button class="record-title" disabled="@busy" @onclick="() => EvidenceAsync(mention.Id)">@mention.Text</button>
+                <div class="meta"><span>@mention.SourceTitle</span><span>Original label @mention.OriginalType</span></div></div></div> }
+            </div>
+            <div class="pager"><button disabled="@(page == 1 || busy)" @onclick="() => PageAsync(-1)">Previous mentions</button><span>Page @(page) / @mentions.Total mentions</span>
+                <button disabled="@(page * mentions.PageSize >= mentions.Total || busy)" @onclick="() => PageAsync(1)">Next mentions</button></div>
+        }
+        <MentionEvidenceView Evidence="evidence" />
+        </div>
+        <aside>
         <EditForm Model="edit" OnValidSubmit="SaveAsync" FormName="edit-entity" class="panel editor">
+            <h2>Correct this entity</h2>
             <DataAnnotationsValidator /><ValidationSummary />
             <label for="canonical-name">Canonical name</label><InputText id="canonical-name" @bind-Value="edit.Name" maxlength="200" />
             <label for="canonical-type">Entity classification</label><InputSelect id="canonical-type" @bind-Value="edit.Type">
                 @foreach (var type in Enum.GetValues<EntityType>()) { <option value="@type">@type</option> }
             </InputSelect>
             <p class="muted">Original mention text and model labels are preserved. Renames retain the previous name as an alias.</p>
-            <button type="submit" disabled="@busy">Save correction</button>
+            <button class="primary" type="submit" disabled="@busy">Save correction</button>
         </EditForm>
-        <p>Known aliases: @(entity.Aliases.Count == 0 ? "None" : string.Join(", ", entity.Aliases))</p>
         <section class="panel"><h2>Merge duplicate entities</h2>
             <p>Merge only after confirming both records refer to the same entity. Similar names alone are insufficient.</p>
             <div class="filters"><label>Find the entity to retain<input @bind="targetSearch" maxlength="200" /></label><button disabled="@busy" @onclick="FindTargetsAsync">Find targets</button></div>
@@ -42,24 +62,17 @@ else if (entity is not null)
                     <button disabled="@(busy || targetPage * targetPageSize >= targetTotal)" @onclick="() => TargetPageAsync(1)">Next matches</button></div>
                 @if (targetId.HasValue) { <a href="@($"/entities/{targetId}")" target="_blank" rel="noopener">Inspect selected entity and its evidence</a> }
             }
-            @if (!confirming) { <button disabled="@(busy || !targetId.HasValue)" @onclick="() => confirming = true">Review merge</button> }
+            @if (!confirming) { <div class="actions"><button disabled="@(busy || !targetId.HasValue)" @onclick="() => confirming = true">Review merge</button></div> }
             else
             {
                 <p>Move all approved mentions from <strong>@entity.Name</strong> into <strong>@targets.FirstOrDefault(x => x.Id == targetId)?.Name</strong>?
                     The former record and source provenance will remain in history.</p>
-                <button disabled="@busy" @onclick="MergeAsync">Confirm entity merge</button><button disabled="@busy" @onclick="() => confirming = false">Cancel</button>
+                <div class="actions"><button class="primary" disabled="@busy" @onclick="MergeAsync">Confirm entity merge</button><button disabled="@busy" @onclick="() => confirming = false">Cancel</button></div>
             }
         </section>
+        </aside>
+        </div>
     }
-    <h2>Source mentions</h2>
-    @if (mentions is not null)
-    {
-        @foreach (var mention in mentions.Items)
-        { <div class="mention-row"><button disabled="@busy" @onclick="() => EvidenceAsync(mention.Id)">@mention.Text</button><span>@mention.SourceTitle / Original label @mention.OriginalType</span></div> }
-        <div class="actions"><button disabled="@(page == 1 || busy)" @onclick="() => PageAsync(-1)">Previous mentions</button><span>Page @(page) / @mentions.Total mentions</span>
-            <button disabled="@(page * mentions.PageSize >= mentions.Total || busy)" @onclick="() => PageAsync(1)">Next mentions</button></div>
-    }
-    <MentionEvidenceView Evidence="evidence" />
 }
 @code {
     [Parameter] public Guid Id { get; set; }

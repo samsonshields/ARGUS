@@ -31,15 +31,15 @@ export function render(element, data, dotnet, investigationId) {
     const locations = new Map(data.locations.map(item => [item.id, item]));
     for (const item of data.locations) {
         const point = [item.latitude, item.longitude];
-        if (item.precision === 'APPROXIMATE') L.circle(point, { radius: item.uncertaintyMeters, color: '#ecc77c', fillOpacity: 0.12, weight: 2, interactive: false }).addTo(state.markers);
-        const marker = L.circleMarker(point, { radius: 8, color: item.precision === 'APPROXIMATE' ? '#ecc77c' : '#80d2df', fillOpacity: 0.9, weight: 2 });
+        if (item.precision === 'APPROXIMATE') L.circle(point, { radius: item.uncertaintyMeters, color: '#f6b704', fillOpacity: 0.12, weight: 2, interactive: false }).addTo(state.markers);
+        const marker = L.circleMarker(point, { radius: 8, color: item.precision === 'APPROXIMATE' ? '#f6b704' : '#fafafa', fillOpacity: 0.9, weight: 2 });
         marker.bindTooltip(safeLabel(`${item.name} · ${item.precision}${item.uncertaintyMeters ? ` ±${item.uncertaintyMeters} m` : ''}`));
         marker.on('click', e => { L.DomEvent.stopPropagation(e); state.dotnet.invokeMethodAsync('SelectRecord', 'location', item.id); });
         marker.addTo(state.markers);
     }
     for (const item of data.events) {
         const location = locations.get(item.locationId); if (!location) continue;
-        const marker = L.circleMarker([location.latitude, location.longitude], { radius: 15, color: '#ad94ee', fillOpacity: 0.2, weight: 3 });
+        const marker = L.circleMarker([location.latitude, location.longitude], { radius: 15, color: '#64a7ff', fillOpacity: 0.2, weight: 3 });
         marker.bindTooltip(safeLabel(`${item.title} · event at ${location.name} (${location.precision})`));
         marker.on('click', e => { L.DomEvent.stopPropagation(e); state.dotnet.invokeMethodAsync('SelectRecord', 'event', item.id); });
         marker.addTo(state.markers);

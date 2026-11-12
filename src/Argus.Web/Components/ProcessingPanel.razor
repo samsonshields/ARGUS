@@ -1,30 +1,32 @@
 @implements IAsyncDisposable
 @inject IntelligenceApiClient Client
 <section class="panel">
-    <h2>Local processing</h2>
+    <div class="panel-head"><h2>Local processing</h2>
+        <div class="actions">
+            <button class="quiet" disabled="@busy" @onclick="CheckAsync">Check NLP readiness</button>
+            <button disabled="@busy" @onclick="() => LoadAsync()">Refresh jobs</button>
+            @if (SourceId.HasValue) { <button class="primary" disabled="@(busy || active)" @onclick="QueueAsync">Queue entity processing</button> }
+        </div></div>
     <p class="muted">Local text/entity or relationship jobs. All generated findings require analyst review.</p>
     @if (error is not null) { <p role="alert" class="error">@error</p> }
-    @if (readiness is not null) { <p role="status">@readiness</p> }
-    <div class="actions">
-        @if (SourceId.HasValue) { <button disabled="@(busy || active)" @onclick="QueueAsync">Queue entity processing</button> }
-        <button disabled="@busy" @onclick="() => LoadAsync()">Refresh jobs</button>
-        <button disabled="@busy" @onclick="CheckAsync">Check NLP readiness</button>
-    </div>
-    @if (jobs is null) { <p role="status">Loading jobs...</p> }
-    else if (jobs.Total == 0) { <p>No processing jobs yet.</p> }
+    @if (readiness is not null) { <p role="status" class="notice">@readiness</p> }
+    @if (jobs is null) { <p role="status">Loading jobs…</p> }
+    else if (jobs.Total == 0) { <div class="empty">No processing jobs yet.</div> }
     else
     {
+        <div class="records">
         @foreach (var job in jobs.Items)
         {
-            <div class="job-row">
-                <a href="@($"/sources/{job.SourceId}")">Source</a>
-                <strong>@job.Kind / @job.State</strong> <span>Attempt @job.Attempts / @job.CreatedAt.ToString("u") / @job.CandidateCount candidates</span>
-                @if (job.Error is not null) { <p class="error">@job.ErrorCode: @job.Error</p> }
+            <div class="job-row" data-status="@job.State">
+                <div class="record-main"><span><strong>@StatusTag.Humanize(job.Kind.ToString()) job</strong> <a href="@($"/sources/{job.SourceId}")">Source</a></span>
+                <div class="meta"><StatusTag Value="job.State" /><span>Attempt @job.Attempts</span><span class="mono">@job.CreatedAt.ToString("u")</span><span>@job.CandidateCount candidates</span></div></div>
                 @if (job.State is JobState.PENDING or JobState.RUNNING) { <button disabled="@busy" @onclick="() => ActAsync(job.Id, false)">Cancel job</button> }
                 @if (job.State is JobState.FAILED or JobState.CANCELLED) { <button disabled="@busy" @onclick="() => ActAsync(job.Id, true)">Retry job</button> }
+                @if (job.Error is not null) { <p class="error">@job.ErrorCode: @job.Error</p> }
             </div>
         }
-        <div class="actions"><button disabled="@(page == 1 || busy)" @onclick="() => PageAsync(-1)">Previous jobs</button>
+        </div>
+        <div class="pager"><button disabled="@(page == 1 || busy)" @onclick="() => PageAsync(-1)">Previous jobs</button>
             <span>Page @(page) / @jobs.Total jobs</span><button disabled="@(page * jobs.PageSize >= jobs.Total || busy)" @onclick="() => PageAsync(1)">Next jobs</button></div>
     }
 </section>

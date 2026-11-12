@@ -3,24 +3,24 @@
 @if (detail is not null)
 {
     var relation = detail.Relationship;
-    <section class="panel relationship-detail">
+    <section class="panel relationship-detail inspector">
         <h2>Relationship evidence</h2>
-        <p><strong>@relation.SourceName @(Relationship.Directed(relation.Type) ? "→" : "↔") @relation.TargetName</strong></p>
-        <p>@relation.Type / @relation.Status / @relation.ApprovedEvidenceCount reviewed passages / @relation.ProposedEvidenceCount pending passages</p>
+        <p class="relation-pair"><strong>@relation.SourceName @(Relationship.Directed(relation.Type) ? "→" : "↔") @relation.TargetName</strong></p>
+        <div class="meta"><span class="tag tag-type">@relation.Type</span><StatusTag Value="relation.Status" /><span>@relation.ApprovedEvidenceCount reviewed passages</span><span>@relation.ProposedEvidenceCount pending passages</span></div>
         <p class="muted">Origin: @relation.Origin. Co-occurrence is not proof of a substantive connection.</p>
         @if (relation.RetiredReason is not null) { <p class="error">@relation.RetiredReason</p> }
         @if (!string.IsNullOrEmpty(relation.Notes)) { <p>Analyst reasoning: @relation.Notes</p> }
         @foreach (var evidence in detail.Evidence)
         {
-            <article class="citation panel">
+            <article class="citation" data-status="@evidence.Status">
                 @if (evidence.Status == ReviewStatus.PROPOSED && relation.Status != ReviewStatus.REJECTED && relation.RetiredReason is null)
                 { <label><input type="checkbox" checked="@selected.Contains(evidence.Id)" @onchange="() => Toggle(evidence.Id)" /> Include this passage in review</label> }
-                <p><a href="@($"/sources/{evidence.SourceId}")">@evidence.SourceTitle</a> / @evidence.Status</p>
+                <p class="evidence-kind"><a href="@($"/sources/{evidence.SourceId}")">@evidence.SourceTitle</a><StatusTag Value="evidence.Status" /></p>
                 <blockquote>@evidence.Quote</blockquote>
                 <p class="muted">Snapshot offsets @evidence.Start–@evidence.End (UTF-16). @evidence.Method</p>
             </article>
         }
-        <div class="actions"><button disabled="@(busy || evidencePage == 1)" @onclick="() => PageAsync(-1)">Previous passages</button>
+        <div class="pager"><button disabled="@(busy || evidencePage == 1)" @onclick="() => PageAsync(-1)">Previous passages</button>
             <span>Page @(evidencePage) / @detail.EvidenceTotal passages</span><button disabled="@(busy || evidencePage * detail.EvidencePageSize >= detail.EvidenceTotal)" @onclick="() => PageAsync(1)">Next passages</button></div>
         @if (relation.Status != ReviewStatus.REJECTED && relation.RetiredReason is null)
         {
@@ -35,15 +35,15 @@
                 { <label><InputCheckbox @bind-Value="review.Reverse" /> Reverse direction (target → source)</label> }
                 <label for="relationship-notes">Analyst reasoning (required for substantive relationships)</label><InputTextArea id="relationship-notes" @bind-Value="review.Notes" maxlength="2000" />
                 <label><InputCheckbox @bind-Value="review.ConfirmEvidenceReviewed" /> I reviewed the selected passages; co-mention alone does not substantiate another relationship type.</label>
-                <div class="actions"><button disabled="@(busy || selected.Count == 0)" type="submit">Approve selected evidence</button>
-                    @if (relation.Status == ReviewStatus.PROPOSED) { <button disabled="@busy" type="button" @onclick="RejectAsync">Reject proposal</button> }
+                <div class="actions"><button class="primary" disabled="@(busy || selected.Count == 0)" type="submit">Approve selected evidence</button>
+                    @if (relation.Status == ReviewStatus.PROPOSED) { <button class="danger" disabled="@busy" type="button" @onclick="RejectAsync">Reject proposal</button> }
                 </div>
             </EditForm>
         }
         @if (success is not null) { <p role="status" class="success">@success</p> }
     </section>
 }
-else if (Id.HasValue) { <p role="status">Loading relationship evidence...</p> }
+else if (Id.HasValue) { <p role="status">Loading relationship evidence…</p> }
 @code {
     [Parameter] public Guid? Id { get; set; }
     [Parameter] public EventCallback Reviewed { get; set; }

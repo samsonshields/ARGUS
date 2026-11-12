@@ -5,54 +5,84 @@
 @inject IJSRuntime JS
 <PageTitle>ARGUS | Relationship graph</PageTitle>
 <InvestigationNav Id="Id" />
-<a href="@($"/investigations/{Id}")">Investigation overview</a> / <a href="@($"/investigations/{Id}/relationships")">Relationship review</a>
-<h1>Relationship graph</h1>
-<p class="muted">Graph structure describes recorded connections, not importance, intent or threat. Co-mentions do not substantiate another relationship.</p>
+<div class="page-head">
+    <div>
+        <h1>Relationship graph</h1>
+        <p class="lede">Graph structure describes recorded connections, not importance, intent or threat. Co-mentions do not substantiate another relationship.</p>
+    </div>
+</div>
 @if (error is not null) { <ErrorNotice Message="@error" /> }
 <form @onsubmit="LoadAsync" @onsubmit:preventDefault class="filters graph-filters">
     <label>Entity type<select aria-label="Entity type" @bind="entityType"><option value="">All entity types</option>@foreach (var type in Enum.GetValues<EntityType>()) { <option>@type</option> }</select></label>
     <label>Relationship type<select aria-label="Relationship type" @bind="relationshipType"><option value="">All relationship types</option>@foreach (var type in Enum.GetValues<RelationshipType>()) { <option>@type</option> }</select></label>
-    <label>Filter names<input @bind="search" maxlength="200" placeholder="Optional graph subset" /></label>
+    <label>Filter names<input @bind="search" maxlength="200" placeholder="Optional graph subset…" /></label>
     <label><input type="checkbox" @bind="includeProposed" /> Include proposed edges</label>
     <button type="submit" disabled="@busy">Apply graph filters</button>
 </form>
-@if (graph is null && error is null) { <p role="status">Loading graph...</p> }
+@if (graph is null && error is null) { <p role="status">Loading graph…</p> }
 else if (graph is not null)
 {
-    <p role="status" id="graph-summary">@graph.Nodes.Count nodes / @graph.Edges.Count edges / @graph.ComponentCount connected components</p>
-    @if (graph.Nodes.Count == 0) { <p class="panel">No approved entities match this graph. Review source mentions in <a href="@($"/investigations/{Id}/entities")">Entities</a>, or clear the current filters.</p> }
-    <div class="graph-legend"><span class="proposed-key">Dashed amber: proposed</span><span class="co-key">Dotted gray: reviewed co-mention</span><span class="approved-key">Solid cyan: analyst-reviewed substantive relationship</span></div>
-    <div class="actions">
-        <button disabled="@(!ready)" @onclick='() => ActionAsync("zoomIn")'>Zoom in</button>
-        <button disabled="@(!ready)" @onclick='() => ActionAsync("zoomOut")'>Zoom out</button>
-        <button disabled="@(!ready)" @onclick='() => ActionAsync("fit")'>Show full graph</button>
-        <button disabled="@(!ready || selectedNode is null)" @onclick='() => ActionAsync("focus")'>Focus selected node</button>
-        <button disabled="@(!ready || selectedNode is null)" @onclick='() => ActionAsync("expand")'>Expand neighbors</button>
+    <div class="graph-toolbar">
+        <p role="status" id="graph-summary" class="graph-summary">@graph.Nodes.Count nodes / @graph.Edges.Count edges / @graph.ComponentCount connected components</p>
+        <div class="tool-group" role="group" aria-label="Graph view controls">
+            <button disabled="@(!ready)" @onclick='() => ActionAsync("zoomIn")'>Zoom in</button>
+            <button disabled="@(!ready)" @onclick='() => ActionAsync("zoomOut")'>Zoom out</button>
+            <button disabled="@(!ready)" @onclick='() => ActionAsync("fit")'>Show full graph</button>
+            <button disabled="@(!ready || selectedNode is null)" @onclick='() => ActionAsync("focus")'>Focus selected node</button>
+            <button disabled="@(!ready || selectedNode is null)" @onclick='() => ActionAsync("expand")'>Expand neighbors</button>
+        </div>
     </div>
-    <div @ref="canvas" class="graph-canvas" role="img" aria-label="Interactive relationship graph. Use the node and edge selectors below for keyboard access."></div>
-    @if (graph.Nodes.Count == 0) { <p class="panel">No approved entities match these filters. Approve source mentions to add nodes.</p> }
-    else if (graph.Edges.Count == 0) { <p class="panel">There are no visible relationships. Generate and review co-mention candidates, or change filters.</p> }
-    <div class="filters">
-        <label>Find and select node<select aria-label="Find and select node" @bind="nodeChoice" @bind:after="SelectNodeAsync"><option value="">Choose a node</option>
-            @foreach (var node in graph.Nodes.OrderBy(x => x.Label)) { <option value="@node.Id">@node.Label / @node.Type</option> }</select></label>
-        <label>Select edge for citations<select aria-label="Select edge for citations" @bind="edgeChoice" @bind:after="SelectEdgeAsync"><option value="">Choose an edge</option>
-            @foreach (var edge in graph.Edges) { <option value="@edge.Id">@EdgeLabel(edge)</option> }</select></label>
+    <div class="graph-layout">
+        <div class="graph-stage">
+            <div @ref="canvas" class="graph-canvas" role="img" aria-label="Interactive relationship graph. Use the node and edge selectors beside it for keyboard access."></div>
+            @if (graph.Nodes.Count == 0) { <div class="empty"><strong>No approved entities match this graph</strong>Review source mentions in <a href="@($"/investigations/{Id}/entities")">Entities</a>, or clear the current filters.</div> }
+            else if (graph.Edges.Count == 0) { <div class="empty"><strong>There are no visible relationships</strong>Generate and review co-mention candidates, or change filters.</div> }
+        </div>
+        <div class="graph-side">
+            <section class="panel" aria-labelledby="legend-heading">
+                <h2 id="legend-heading">Reading the graph</h2>
+                <ul class="legend">
+                    <li><svg viewBox="0 0 34 12" aria-hidden="true"><line x1="1" y1="6" x2="33" y2="6" stroke="#1ed760" stroke-width="2.5" /></svg>Analyst-reviewed substantive relationship</li>
+                    <li><svg viewBox="0 0 34 12" aria-hidden="true"><line x1="1" y1="6" x2="33" y2="6" stroke="#f6b704" stroke-width="2.5" stroke-dasharray="5 4" /></svg>Proposed, awaiting review</li>
+                    <li><svg viewBox="0 0 34 12" aria-hidden="true"><line x1="2" y1="6" x2="33" y2="6" stroke="#8f8f94" stroke-width="2.5" stroke-dasharray="0.1 5" stroke-linecap="round" /></svg>Reviewed co-mention</li>
+                </ul>
+                <ul class="legend legend-cols">
+                    <li><svg class="node-key" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="#fafafa" /></svg>Person</li>
+                    <li><svg class="node-key" viewBox="0 0 14 14" aria-hidden="true"><rect x="1" y="1" width="12" height="12" rx="3" fill="#b4b4b4" /></svg>Organization</li>
+                    <li><svg class="node-key" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 0.5 13.5 7 7 13.5 0.5 7Z" fill="#64a7ff" /></svg>Location</li>
+                    <li><svg class="node-key" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="#8f8f94" stroke-width="2" /></svg>Other</li>
+                </ul>
+            </section>
+            <section class="panel" aria-labelledby="inspect-heading">
+                <h2 id="inspect-heading">Inspect</h2>
+                <label>Find and select node<select aria-label="Find and select node" @bind="nodeChoice" @bind:after="SelectNodeAsync"><option value="">Choose a node</option>
+                    @foreach (var node in graph.Nodes.OrderBy(x => x.Label)) { <option value="@node.Id">@node.Label / @node.Type</option> }</select></label>
+                <label>Select edge for citations<select aria-label="Select edge for citations" @bind="edgeChoice" @bind:after="SelectEdgeAsync"><option value="">Choose an edge</option>
+                    @foreach (var edge in graph.Edges) { <option value="@edge.Id">@EdgeLabel(edge)</option> }</select></label>
+            </section>
+            @if (selectedNode is not null)
+            {
+                <section class="panel"><h2>Selected node: @selectedNode.Label</h2>
+                    <dl class="facts">
+                        <dt>Classification</dt><dd><span class="tag tag-type">@selectedNode.Type</span></dd>
+                        <dt>Incident edges</dt><dd>@selectedNode.ConnectionCount</dd>
+                        <dt>Unique neighbors</dt><dd>@selectedNode.Degree</dd>
+                        <dt>Component</dt><dd>@selectedNode.Component</dd>
+                        <dt>Degree centrality</dt><dd class="mono">@selectedNode.DegreeCentrality.ToString("F3")</dd>
+                        <dt>Betweenness</dt><dd class="mono">@selectedNode.Betweenness.ToString("F3") normalized</dd>
+                    </dl>
+                    <p><a href="@($"/entities/{selectedNode.Id}")">Entity and source mentions</a></p></section>
+            }
+            <section class="panel"><h2>Shortest connection path</h2>
+                <label>Path start<select aria-label="Path start" @bind="pathStart"><option value="">Choose start</option>@foreach (var node in graph.Nodes) { <option value="@node.Id">@node.Label</option> }</select></label>
+                <label>Path end<select aria-label="Path end" @bind="pathEnd"><option value="">Choose end</option>@foreach (var node in graph.Nodes) { <option value="@node.Id">@node.Label</option> }</select></label>
+                <label class="check-gap"><input type="checkbox" @bind="respectDirection" /> Respect direction for substantive directed edges</label>
+                <div class="actions"><button disabled="@(busy || !pathStart.HasValue || !pathEnd.HasValue)" @onclick="FindPathAsync">Highlight shortest path</button></div>
+                @if (pathMessage is not null) { <p role="status">@pathMessage</p> }
+                <p class="muted">Paths and metrics use current filters. A path is a structural connection, not evidence of wrongdoing.</p>
+            </section>
+        </div>
     </div>
-    @if (selectedNode is not null)
-    {
-        <section class="panel"><h2>Selected node: @selectedNode.Label</h2>
-            <p>@selectedNode.Type / @selectedNode.ConnectionCount incident edges / @selectedNode.Degree unique neighbors / component @selectedNode.Component</p>
-            <p>Degree centrality @selectedNode.DegreeCentrality.ToString("F3") / normalized betweenness @selectedNode.Betweenness.ToString("F3")</p>
-            <a href="@($"/entities/{selectedNode.Id}")">Entity and source mentions</a></section>
-    }
-    <section class="panel"><h2>Shortest connection path</h2>
-        <div class="filters"><label>Path start<select aria-label="Path start" @bind="pathStart"><option value="">Choose start</option>@foreach (var node in graph.Nodes) { <option value="@node.Id">@node.Label</option> }</select></label>
-            <label>Path end<select aria-label="Path end" @bind="pathEnd"><option value="">Choose end</option>@foreach (var node in graph.Nodes) { <option value="@node.Id">@node.Label</option> }</select></label></div>
-        <label><input type="checkbox" @bind="respectDirection" /> Respect direction for substantive directed edges</label>
-        <button disabled="@(busy || !pathStart.HasValue || !pathEnd.HasValue)" @onclick="FindPathAsync">Highlight shortest path</button>
-        @if (pathMessage is not null) { <p role="status">@pathMessage</p> }
-        <p class="muted">Paths and metrics use current filters. A path is a structural connection, not evidence of wrongdoing.</p>
-    </section>
     <RelationshipInspector Id="selectedEdge" Reviewed="ReloadAfterReviewAsync" />
 }
 @code {
