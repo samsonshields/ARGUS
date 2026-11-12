@@ -227,7 +227,7 @@ public sealed class TemporalApiTests : IDisposable
         using var api = Factory(); using var client = api.CreateClient();
         var relationships = (await client.GetFromJsonAsync<PageResult<RelationshipSummary>>($"/api/v1/investigations/{inv.Id}/relationships", Json))!; Assert.Single(relationships.Items);
         Assert.Empty((await client.GetFromJsonAsync<PageResult<EventResponse>>($"/api/v1/investigations/{inv.Id}/events", Json))!.Items);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/v1/investigations/{inv.Id}/claims")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/v1/investigations/{inv.Id}/backups")).StatusCode);
     }
     public sealed class EventsPipeline : IEventClient
     {

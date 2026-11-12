@@ -243,7 +243,7 @@ public sealed class TemporalService(ArgusDbContext db, IEventClient client)
                join s in db.SourceTextSnapshots on e.SnapshotId equals s.Id
                join source in db.Sources on e.SourceId equals source.Id
                orderby e.CreatedAt, e.Id
-               select new CitationResponse(e.Id, s.Id, source.Id, source.Title, s.TextHash, e.Start, e.End, s.Text.Substring(e.Start, e.End - e.Start))).ToListAsync(ct));
+               select new CitationResponse(e.Id, s.Id, source.Id, source.Title, s.TextHash, e.Start, e.End, TemporalRules.Quote(s.Text, e.Start, e.End))).ToListAsync(ct));
     private async Task<LocationResponse> LocationResponseAsync(LocationProfile item, CancellationToken ct) => new(item.Id, item.InvestigationId, item.EntityId,
         await db.Entities.Where(x => x.Id == item.EntityId).Select(x => x.Name).SingleAsync(ct), item.Precision, item.Latitude, item.Longitude, item.UncertaintyMeters,
         item.Basis, item.Notes, item.Status, item.Revision,
@@ -252,7 +252,7 @@ public sealed class TemporalService(ArgusDbContext db, IEventClient client)
                join s in db.SourceTextSnapshots on e.SnapshotId equals s.Id
                join source in db.Sources on e.SourceId equals source.Id
                orderby e.CreatedAt, e.Id
-               select new CitationResponse(e.Id, s.Id, source.Id, source.Title, s.TextHash, e.Start, e.End, s.Text.Substring(e.Start, e.End - e.Start))).ToListAsync(ct));
+               select new CitationResponse(e.Id, s.Id, source.Id, source.Title, s.TextHash, e.Start, e.End, TemporalRules.Quote(s.Text, e.Start, e.End))).ToListAsync(ct));
     private async Task InvestigationAsync(Guid id, CancellationToken ct)
     { if (!await db.Investigations.AnyAsync(x => x.Id == id, ct)) throw new SourceException(404, "Investigation not found."); }
     private async Task<AnalysisEvent> FindEventAsync(Guid id, CancellationToken ct) => await db.Events.SingleOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, ct)

@@ -8,6 +8,9 @@ namespace Argus.Core.Services;
 
 public static class TemporalRules
 {
+    // This method stays in .NET: SQLite substr counts Unicode scalars, not UTF-16 units.
+    public static string Quote(string text, int start, int end)
+    { Citation(text, start, end); return text[start..end]; }
     public static void Citation(string text, int start, int end)
     {
         if (start < 0 || end <= start || end > text.Length || end - start > 8000 || !EntityText.Boundary(text, start) ||

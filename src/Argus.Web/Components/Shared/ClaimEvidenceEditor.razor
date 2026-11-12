@@ -1,0 +1,58 @@
+@inject AssessmentApiClient Client
+@inject TemporalApiClient Temporal
+@inject SourceClient Sources
+<h3>Claim evidence</h3>
+<p class="muted">A quotation records what a source states. Reliability is the analyst's source grade, not verification of the claim.</p>
+@if (error is not null) { <p role="alert" class="error">@error</p> }
+@foreach (var evidence in Claim.Evidence)
+{
+    <figure class="citation"><p><strong>@evidence.Relationship</strong> · manual source reliability @evidence.Reliability</p>
+    <blockquote>@evidence.Quote</blockquote><figcaption><a href="@($"/sources/{evidence.SourceId}")">@evidence.SourceTitle</a> · UTF-16 @evidence.Start–@evidence.End
+    <details><summary>Snapshot provenance</summary><p>@evidence.SnapshotId</p><code>@evidence.TextHash</code></details></figcaption>
+    @if (evidence.Notes.Length > 0) { <p>Analyst evidence note: @evidence.Notes</p> }
+    <div class="actions"><button disabled="@busy" @onclick="() => Edit(evidence)">Edit evidence label / note</button><button disabled="@busy" @onclick="() => RemoveAsync(evidence.Id)">Remove evidence</button></div></figure>
+}
+@if (Claim.Evidence.Count == 0) { <p>Add supporting evidence before approval. Contradictory passages must remain visible when reviewing the claim.</p> }
+<details open="@(editing is not null)"><summary>Add or classify a source passage</summary>
+    <label>Evidence relationship<select aria-label="Evidence relationship" @bind="relationship">@foreach (var kind in Enum.GetValues<EvidenceRelationship>()) { <option>@kind</option> }</select></label>
+    <label>Analyst evidence note<textarea aria-label="Analyst evidence note" maxlength="2000" @bind="notes"></textarea></label>
+    @if (editing is not null)
+    { <p>Editing the label/note on the selected preserved quotation.</p><button disabled="@busy" @onclick="SaveLabelAsync">Save evidence label</button><button disabled="@busy" @onclick="() => editing = null">Cancel evidence edit</button> }
+    else
+    {
+        <label>Source<select aria-label="Claim citation source" @bind="sourceId" @bind:after="LoadAsync"><option value="">Choose source</option>@foreach (var source in sources) { <option value="@source.Id">@source.Title (reliability @source.Reliability)</option> }</select></label>
+        @if (passages is not null)
+        {
+            @foreach (var passage in passages.Items) { <div class="citation"><pre class="passage">@passage.Quote</pre><button disabled="@busy" @onclick="() => AddAsync(passage)">Attach passage @passage.Start–@passage.End</button></div> }
+            <button disabled="@(busy || page <= 1)" @onclick="() => PageAsync(-1)">Previous passages</button><button disabled="@(busy || page * 10 >= passages.Total)" @onclick="() => PageAsync(1)">Next passages</button>
+        }
+    }
+</details>
+@code {
+    [Parameter, EditorRequired] public ClaimDetail Claim { get; set; } = default!;
+    [Parameter] public EventCallback Changed { get; set; }
+    private List<SourceSummary> sources = [];
+    private Guid? sourceId;
+    private PageResult<PassageResponse>? passages;
+    private ClaimEvidenceResponse? editing;
+    private EvidenceRelationship relationship;
+    private string notes = "";
+    private int page = 1;
+    private bool busy;
+    private string? error;
+    protected override async Task OnInitializedAsync() => await RunAsync(async () => sources = await Sources.ListAsync(Claim.Claim.InvestigationId));
+    private void Edit(ClaimEvidenceResponse evidence) { editing = evidence; relationship = evidence.Relationship; notes = evidence.Notes; }
+    private async Task LoadAsync() { page = 1; await FetchAsync(); }
+    private async Task PageAsync(int delta) { page += delta; await FetchAsync(); }
+    private async Task FetchAsync() => await RunAsync(async () => passages = sourceId.HasValue ? await Temporal.PassagesAsync(sourceId.Value, page) : null);
+    private async Task AddAsync(PassageResponse passage) => await SaveEvidenceAsync(passage.SnapshotId, passage.Start, passage.End);
+    private async Task SaveLabelAsync() { if (editing is not null) await SaveEvidenceAsync(editing.SnapshotId, editing.Start, editing.End); }
+    private async Task SaveEvidenceAsync(Guid snapshot, int start, int end) => await RunAsync(async () =>
+    {
+        await Client.ActionAsync(Claim.Claim.Id, "evidence", new ClaimEvidenceRequest { SnapshotId = snapshot, Start = start, End = end, Relationship = relationship, Notes = notes, Revision = Claim.Claim.Revision });
+        editing = null; notes = ""; await Changed.InvokeAsync();
+    });
+    private async Task RemoveAsync(Guid id) => await RunAsync(async () => { await Client.RemoveEvidenceAsync(Claim.Claim.Id, id, Claim.Claim.Revision); await Changed.InvokeAsync(); });
+    private async Task RunAsync(Func<Task> action)
+    { busy = true; error = null; try { await action(); } catch (HttpRequestException ex) { error = ex.Message; } catch (TaskCanceledException) { error = "Request timed out. Reload before retrying."; } finally { busy = false; } }
+}

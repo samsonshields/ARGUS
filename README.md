@@ -1,11 +1,12 @@
 # ARGUS
 
-Local-first OSINT analysis workstation for Windows. Phases 1-5 provide investigations,
+Local-first OSINT analysis workstation for Windows. Phases 1-6 provide investigations,
 preserved source documents, asynchronous local entity recognition and analyst review.
 Approve/correct/reject mentions, inspect exact source evidence, associate mentions
 with existing entities and explicitly merge duplicate records. Explore evidence-linked
 relationship graphs and review sentence co-mentions. Build reviewed timelines and
-geographic views with precise source citations. **Phase 6 has not begun.**
+geographic views with precise source citations. Construct reviewed analytical claims and
+export source-backed Markdown reports. **Phase 7 has not begun.**
 
 ## Requirements
 
@@ -81,6 +82,7 @@ python scripts/smoke.py
 python scripts/smoke_nlp.py
 intelligence-service/.venv/Scripts/python.exe scripts/smoke_graph.py
 intelligence-service/.venv/Scripts/python.exe scripts/smoke_temporal.py
+intelligence-service/.venv/Scripts/python.exe scripts/smoke_assessments.py
 intelligence-service/.venv/Scripts/python.exe -m pytest intelligence-service/tests -q -c intelligence-service/pyproject.toml
 intelligence-service/.venv/Scripts/python.exe -m ruff check intelligence-service/app intelligence-service/tests
 intelligence-service/.venv/Scripts/python.exe -m ruff format --check intelligence-service/app intelligence-service/tests
@@ -292,6 +294,50 @@ coverage targets Edge desktop; the Python test client emits one upstream depreca
 See the [development plan](docs/development-plan.md) for the complete verification record.
 Restart API, Web and Python after rebuilding to load Phase 5 and apply its migration.
 
+## Assessments and Markdown reports
+
+Choose **Assessments and claims** inside an investigation. Create a statement, select
+manual confidence and record analyst interpretation/reasoning. Save the proposal, attach
+specific source passages, and classify each as SUPPORTS, CONTRADICTS or CONTEXT. Source
+reliability grades appear alongside quotes. Evidence labels/notes can be corrected;
+removing evidence preserves its history. No NLP or external model authors these claims.
+
+Read both supporting and contradictory passages before approval. Approval requires
+support, reasoning and explicit acknowledgment of unresolved contradictions. You may
+record a reasoned resolution, but contradictory passages remain visible. Confidence is
+LOW, MODERATE, HIGH or INSUFFICIENT_INFORMATION; it is not a probability. Approval means
+analyst review, not independent verification. Content/evidence changes require renewed
+review; evidence changes also clear prior contradiction resolutions. Filters and the
+assessment summary identify unresolved contradictions, including approved ones.
+
+Choose **Markdown reports**, select **Validate report content**, inspect the errors and
+warnings, then confirm review and generate finalized Markdown. Generation revalidates
+approved findings, exact citations, snapshot hashes and original files before saving an
+immutable report. Draft/rejected/removed findings never enter finalized reports. Reports
+include all ten prescribed sections, uncertainty, confidence, contradictory evidence,
+source evaluation and exact references; empty optional modules receive explicit notices.
+
+Download the `.md` attachment or inspect the encoded Markdown preview. Saved reports
+retain their generation time and SHA-256; later edits do not rewrite previous snapshots.
+Correct the findings and generate another report when needed. Missing or changed source
+originals block generation rather than producing unverifiable references. Stored reports
+are analytical exports, not backups of the investigation database/documents.
+
+`smoke_assessments.py` drives the real API/Web claim editor, evidence classifications,
+review acknowledgment, filters, validation and actual browser downloads in headless Edge.
+It independently renders Markdown with CommonMark, checks reference anchors and escaping,
+and verifies report immutability and restart persistence. Markdown-it-py 4.3.0 is a
+verification-only dependency, now explicit in requirements-dev (already pinned in the
+lockfile). No new production library or Python processing endpoint was added.
+Artifacts are ignored under `.local/phase6-*.png` and `.local/smoke-assessments.log`.
+See [assessment/report contracts](docs/assessment-contracts.md) for API rules and limits.
+Phase 6 verification passed: **154 .NET tests** (79 unit/75 integration), **53 Python
+tests**, a Release build with zero warnings/errors, migration/format/lint/dependency
+checks and all five live smoke workflows. Reports were independently rendered and
+reference anchors checked. See the [development plan](docs/development-plan.md) for results
+and known limits. One upstream Python test-client warning remains.
+Restart API and Web after rebuilding to load Phase 6 and its additive migration.
+
 ## Structure
 
 - `Argus.sln`: Web, API, Core, Infrastructure, unit and integration test projects.
@@ -311,8 +357,7 @@ Microsoft.OpenApi is pinned to patched 2.7.5 rather than the vulnerable transiti
 The graph workflow has automated Edge browser coverage and screenshots. Broader
 file-selection/entity-review UI workflows retain their manual checklists. English NER is
 model-dependent and may miss or misclassify entities. Python test tooling currently
-emits one upstream httpx deprecation warning; tests still pass. Assessments and reports
-remain deferred to Phase 6.
+emits one upstream httpx deprecation warning; tests still pass. Phase 7 remains deferred.
 
 See [specification](docs/project_specifications.md), [architecture](docs/architecture.md),
 [API contracts](docs/api-contracts.md), [schema](docs/database-schema.md) and

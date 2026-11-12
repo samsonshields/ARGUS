@@ -223,7 +223,7 @@ public sealed class IntelligenceWorkflowTests : IDisposable
     }
 
     [Fact]
-    public async Task PaginationValidationAndOpenApiWorkWithoutPhaseSixEndpoints()
+    public async Task PaginationValidationAndOpenApiWorkWithoutPhaseSevenEndpoints()
     {
         using var api = Factory();
         using var client = api.CreateClient();
@@ -237,7 +237,7 @@ public sealed class IntelligenceWorkflowTests : IDisposable
         var schema = await client.GetStringAsync("/openapi/v1.json");
         Assert.Contains("/api/v1/sources/{id}/process", schema);
         Assert.Contains("/graph", schema);
-        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/v1/investigations/{inv}/claims")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/v1/investigations/{inv}/backups")).StatusCode);
     }
 
     [Fact]

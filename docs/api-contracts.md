@@ -187,4 +187,10 @@ are documented below.
 
 See [temporal and geographic contracts](temporal-contracts.md) for event generation,
 timeline/review/citations, location profiles, map filters and geographic focus APIs.
-All earlier APIs remain compatible. No Phase 6 claims or reports are exposed.
+All earlier APIs remain compatible. Phase 6 additions follow below.
+
+## Phase 6 additions
+
+See [assessment/report contracts](assessment-contracts.md) for claims, evidence
+classifications, analyst confidence/review, summaries, report validation/history and
+Markdown attachments. Phase 7 backup APIs remain absent.

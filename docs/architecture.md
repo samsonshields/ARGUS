@@ -1,4 +1,4 @@
-# Architecture through Phase 5
+# Architecture through Phase 6
 
 The repository root is the proposed argus monorepo root. The supplied specification
 is project_specifications.md; the requested hyphenated filename is absent. There was
@@ -185,4 +185,35 @@ fresh approval. Soft removal retains citations, provenance and audit history. Un
 locations are retained for review but never represented as precise points. See
 [temporal contracts](temporal-contracts.md) for limits and wire semantics.
 
-Phase 6 assessments, claims and reports have not been started.
+Phase 6 was subsequently authorized and is described below.
+
+## Phase 6: analyst assessments and report snapshots
+
+Core adds Claim, ClaimEvidence, GeneratedReport, confidence/evidence enums and validated
+DTOs. ClaimService coordinates analyst-authored statements, manual confidence, exact
+source passages, support/contradiction/context labels and explicit review. Optimistic
+claim revisions also protect evidence updates; changes require renewed review and clear
+previous conflict resolutions. Before/after audit records preserve corrections, source
+provenance and manual confidence changes. No automated confidence scoring or model-generated
+claims were introduced. Python processing remains unchanged and is not needed to author
+claims or export reports from existing sources.
+
+ReportService selects approved active material, validates references and original-file
+hashes, and persists the completed Markdown artifact/audit in one SQLite transaction.
+Report generation is bounded and deterministic; MarkdownReport in Core formats the ten
+sections and escapes untrusted text. Missing optional modules remain explicit, unknown
+precision is preserved, and conflicts remain visible. Report artifacts contain Markdown,
+UTC generation time, SHA-256 and validation metadata; there is no edit/delete endpoint.
+Downloads recheck their content hash. Snapshot approvals are historical, not live review
+state. Sources and snapshots are retained independently of later assessment edits.
+
+AssessmentsReports is an additive migration with restricted finding/evidence/report
+foreign keys. Web uses AssessmentApiClient and no database access. Focused Blazor pages
+provide claim/evidence review, source grades, conflict filters, final validation, an
+encoded preview and attachment downloads through Web's API proxy. A CommonMark parser
+is used only for smoke verification, not in the production request path. The verification
+also found and corrected SQLite-vs-UTF-16 substring mismatch: citation slicing now stays
+in .NET, including temporal quotations used in reports.
+
+Phase 7 quality/performance/backup/demo/portfolio work has not been started. See
+[assessment contracts](assessment-contracts.md) for explicit export bounds and semantics.

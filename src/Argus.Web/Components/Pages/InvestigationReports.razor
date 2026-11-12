@@ -1,0 +1,54 @@
+@page "/investigations/{Id:guid}/reports"
+@rendermode InteractiveServer
+@inject AssessmentApiClient Client
+<PageTitle>ARGUS | Reports</PageTitle>
+<a href="@($"/investigations/{Id}")">Investigation overview</a> · <a href="@($"/investigations/{Id}/assessments")">Claims and evidence</a>
+<p class="eyebrow">REPORTS / APPROVED ASSESSMENT SNAPSHOTS</p><h1>Markdown reports</h1>
+<p class="muted">Validate source provenance and original files, then export approved findings. Reports retain confidence, uncertainty, contradictory evidence and analytical limitations. Saved reports preserve approvals at generation time.</p>
+@if (error is not null) { <p class="error" role="alert">@error</p> }
+@if (message is not null) { <p role="status" class="success">@message</p> }
+<div class="actions" data-report-ready="@interactive.ToString().ToLowerInvariant()"><button disabled="@(busy || !interactive)" @onclick="ValidateAsync">Validate report content</button><button disabled="@busy" @onclick="ReloadAsync">Refresh report history</button></div>
+@if (validation is not null)
+{
+    <section class="panel" aria-label="Report validation"><h2>@(validation.IsValid ? "Validation passed" : "Validation blocked export")</h2>
+    <p>@validation.ClaimCount claims · @validation.EntityCount entities · @validation.EventCount events · @validation.LocationCount locations · @validation.SourceCount sources · @validation.PassageCount distinct passages</p>
+    @foreach (var issue in validation.Errors) { <p class="error">@issue</p> }
+    @foreach (var warning in validation.Warnings) { <p class="contradiction">@warning</p> }
+    </section>
+}
+<label><input type="checkbox" @bind="confirm" />I reviewed the approved content, confidence, contradictions and limitations for this report snapshot.</label>
+<button disabled="@(busy || !interactive || !confirm || validation?.IsValid != true)" @onclick="GenerateAsync">Generate finalized Markdown</button>
+<p class="muted">Generation repeats validation inside its transaction. A prior validation result cannot bypass changes made since it ran.</p>
+@if (items is null) { <p role="status">Loading report history…</p> }
+else
+{
+    <h2>Saved reports</h2>
+    @if (items.Total == 0) { <p>No reports generated yet.</p> }
+    @foreach (var item in items.Items)
+    { <div class="relationship-row"><button disabled="@busy" @onclick="() => SelectAsync(item.Id)">@item.GeneratedAt.ToString("u")</button><a href="@($"/downloads/reports/{item.Id}")" data-enhance-nav="false">Download Markdown</a><span>@item.FileName</span></div> }
+    <div class="actions"><button disabled="@(busy || page <= 1)" @onclick="() => PageAsync(-1)">Previous reports</button><button disabled="@(busy || page * 20 >= items.Total)" @onclick="() => PageAsync(1)">Next reports</button></div>
+}
+@if (selected is not null)
+{
+    <section class="panel"><h2>Report snapshot</h2><p>@selected.Report.GeneratedAt.ToString("u") · <a href="@($"/downloads/reports/{selected.Report.Id}")" data-enhance-nav="false">Download selected Markdown</a></p>
+    <p>SHA-256: <code>@selected.Report.ContentHash</code></p><p>This snapshot is immutable. Generate a new report to include later corrections.</p>
+    <pre class="source-text report-markdown" aria-label="Markdown report preview">@selected.Markdown</pre></section>
+}
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private PageResult<ReportSummary>? items;
+    private ReportValidation? validation;
+    private ReportResponse? selected;
+    private bool busy, confirm, interactive;
+    private int page = 1;
+    private string? error, message;
+    protected override async Task OnParametersSetAsync() => await ReloadAsync();
+    protected override Task OnAfterRenderAsync(bool firstRender) { if (firstRender) { interactive = true; StateHasChanged(); } return Task.CompletedTask; }
+    private async Task ReloadAsync() => await RunAsync(async () => items = await Client.ReportsAsync(Id, page));
+    private async Task PageAsync(int delta) { page += delta; await ReloadAsync(); }
+    private async Task ValidateAsync() => await RunAsync(async () => { validation = await Client.ValidationAsync(Id); confirm = false; });
+    private async Task GenerateAsync() => await RunAsync(async () => { selected = await Client.GenerateAsync(Id, confirm); validation = selected.Validation; confirm = false; items = await Client.ReportsAsync(Id, page); message = "Finalized Markdown snapshot saved."; });
+    private async Task SelectAsync(Guid id) => await RunAsync(async () => { selected = await Client.ReportAsync(id); if (selected.Report.InvestigationId != Id) { selected = null; throw new HttpRequestException("Report belongs to another investigation."); } });
+    private async Task RunAsync(Func<Task> action)
+    { busy = true; error = null; message = null; try { await action(); } catch (HttpRequestException ex) { error = ex.Message; } catch (TaskCanceledException) { error = "Request timed out. Refresh history before retrying generation."; } finally { busy = false; } }
+}

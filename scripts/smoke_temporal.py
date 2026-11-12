@@ -329,9 +329,9 @@ def main():
                 and persisted["focus"]
             )
             assert call(f"/events/{item['id']}")["datePrecision"] == "MONTH"
-            expect_error(lambda: request(route + f"/investigations/{inv}/claims"), 404)
+            expect_error(lambda: request(route + f"/investigations/{inv}/backups"), 404)
             print(
-                "PASS: real date pipeline, exact/partial/relative/ambiguous dates, reviewed timeline updates, entity/source links, offline Leaflet markers/circles/selection/filtering, draft-only map clicks, location review, focus, optional tile failure/attribution, XSS-safe labels, deduplication and API restart persistence; Phase 6 absent."
+                "PASS: real date pipeline, exact/partial/relative/ambiguous dates, reviewed timeline updates, entity/source links, offline Leaflet markers/circles/selection/filtering, draft-only map clicks, location review, focus, optional tile failure/attribution, XSS-safe labels, deduplication and API restart persistence; Phase 7 absent."
             )
         finally:
             stop(web)
