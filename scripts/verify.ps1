@@ -25,7 +25,7 @@ try {
     Invoke-Checked -Executable $taskPython -Arguments @('-m', 'pip', 'check')
     if ($Full) {
         $env:ARGUS_BUILD_CONFIGURATION = $Configuration
-        foreach ($script in @('smoke.py', 'smoke_nlp.py', 'smoke_graph.py', 'smoke_temporal.py', 'smoke_assessments.py', 'smoke_demo.py')) {
+        foreach ($script in @('smoke.py', 'smoke_nlp.py', 'smoke_candidate_review.py', 'smoke_graph.py', 'smoke_temporal.py', 'smoke_assessments.py', 'smoke_demo.py')) {
             Invoke-Checked -Executable $taskPython -Arguments @("scripts/$script")
         }
     }

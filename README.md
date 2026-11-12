@@ -110,7 +110,7 @@ ARGUS is single-user and has no authentication or public-hosting hardening.
 # Build, unit/integration/Python suites, formatting and lint
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify.ps1
 
-# Also run six isolated live workflows, including Edge and backup/restore
+# Also run seven isolated live workflows, including Edge and backup/restore
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify.ps1 -Full
 ```
 

@@ -16,9 +16,11 @@
     <label>Entity type<select aria-label="Entity type" @bind="entityType"><option value="">All entity types</option>@foreach (var type in Enum.GetValues<EntityType>()) { <option>@type</option> }</select></label>
     <label>Relationship type<select aria-label="Relationship type" @bind="relationshipType"><option value="">All relationship types</option>@foreach (var type in Enum.GetValues<RelationshipType>()) { <option>@type</option> }</select></label>
     <label>Filter names<input @bind="search" maxlength="200" placeholder="Optional graph subset…" /></label>
-    <label><input type="checkbox" @bind="includeProposed" /> Include proposed edges</label>
+    <label><input type="checkbox" @bind="includeProposed" @bind:after="LoadAsync" disabled="@busy" /> Include proposed edges</label>
     <button type="submit" disabled="@busy">Apply graph filters</button>
 </form>
+<p class="muted">Nodes are approved entities. This checkbox immediately shows or hides proposed relationship edges; it does not add unreviewed entity mentions.
+    Approve mentions in <a href="@($"/investigations/{Id}/entities")">Entities</a>, then generate co-mentions in <a href="@($"/investigations/{Id}/relationships")">Relationships</a>.</p>
 @if (graph is null && error is null) { <p role="status">Loading graph…</p> }
 else if (graph is not null)
 {

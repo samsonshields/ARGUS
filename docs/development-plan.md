@@ -465,3 +465,61 @@ Verification (`scripts/verify.ps1 -Full`): zero build warnings/errors; 164 .NET 
 all six smoke suites passed, including the mobile no-overflow check and the
 zero-external-request assertion. Accessible names, labels and smoke-test hooks were preserved.
 Other browser engines and physical devices remain unverified.
+
+## Post-Phase 7: candidate review and graph filter corrections
+
+Completed on 2026-11-12 (America/New_York), following the local DNI 2026 threat-assessment
+PDF report. Preserved the user's defense-focused UI: no CSS, fonts, colors, layout theme,
+graph rendering styles or portfolio screenshots were changed by this correction.
+
+- Review status and candidate-type selections now refresh immediately and reset pagination.
+  Added an explicit all-status view and bounded text search. Approved and rejected mentions
+  retain their original evidence and remain inspectable; approved canonical entities are
+  still listed independently. Each repeated source occurrence remains a separate record.
+- API mention filters combine status, original type, literal text search and existing
+  investigation/source/entity scopes before pagination. Invalid enum values return 400.
+- Review loads discard superseded responses, clamp pages after reviewing the last item,
+  and show an error instead of perpetual loading when the initial request fails.
+- The graph's proposed-edge checkbox applies immediately. Inline guidance explains that
+  it controls relationships between approved canonical entities. Entity proposals do not
+  become graph nodes before analyst review; relationship generation remains explicit.
+- The spaCy entity pipeline excludes CARDINAL, ORDINAL, QUANTITY, MONEY and PERCENT
+  results rather than converting ordinary counts/amounts into OTHER identities. Dates,
+  names, nationalities and other retained model labels keep their existing mappings.
+  No model/dependency replacement or database migration was required.
+- Existing stored proposals and all review decisions are preserved. Rerunning extraction
+  does not erase older numeric proposals. Use type/search filters to narrow existing queues;
+  the new exclusion applies to newly generated candidates.
+- Added `scripts/smoke_candidate_review.py`, included in the full verification gate (now
+  seven smokes). Optional `--pdf <local-path>` imports the supplied file into temporary
+  data, never the normal workspace. Updated setup and API/NLP contracts.
+
+Verification:
+
+- .NET SDK 10.0.102 and Python 3.14.6 verified. Debug build passed with zero warnings/errors.
+  The initial Release build could not copy locked assemblies held by the user's existing
+  API/Web processes; those processes were left running and validation used Debug instead.
+- .NET: **168 passed** (79 unit, 89 integration); Python: **64 passed**. Total:
+  **232 passed**, zero failures/skips. One upstream Starlette/httpx warning remains.
+  An initial pytest cache warning was avoided using a fresh ignored test cache directory.
+- .NET format verification, Ruff lint/format and `git diff --check`: passed.
+- New real-model/headless Edge workflow passed paging beyond the first twenty mentions,
+  immediate approved/rejected/all-status changes, source evidence, text/type filters,
+  actual UI approval/rejection, canonical entity navigation and proposed-edge changes
+  without pressing Apply. Screenshot inspected: `.local/candidate-review-fixed.png`.
+- The supplied PDF passed actual import, background extraction and real spaCy processing:
+  **1,130 proposals**, all checked against exact UTF-16 snapshot passages. Direct comparison
+  with the unfiltered model found 1,235 occurrences, including 105 quantity results;
+  retained results represent 396 distinct text/type pairs in 11,447 source words.
+  These counts describe model suggestions, not independently verified identities.
+- Existing real NLP/outage/retry/reprocessing/restart smoke passed and retained review
+  decisions and original bytes. Existing 100-node/300-edge Edge smoke passed filters,
+  citations, review, paths and persistence: 272 ms render, 1,106 ms initial load on this
+  machine. Other unrelated smoke suites were not rerun for this correction.
+- Temporary test services stopped afterward. The normal workspace was inspected read-only;
+  the user's supplied PDF and existing screenshot changes remain untouched/uncommitted.
+
+To use the correction, stop the current API/Web processes before rebuilding their Release
+configuration, then restart API, Web and NLP. No migration or data deletion is needed.
+The English model still produces false positives and omissions: review/correct its findings;
+ordinary source text is preserved in Extracted text even when not recognized as a candidate.

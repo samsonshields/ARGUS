@@ -22,13 +22,19 @@ public sealed class EntityReviewService(ArgusDbContext db, IOptions<Intelligence
         await db.Relationships.CountAsync(x => x.RetiredReason == null && x.Status == ReviewStatus.APPROVED, ct));
 
     public async Task<PageResult<MentionResponse>> MentionsAsync(Guid investigationId, Guid? sourceId, Guid? entityId,
-        ReviewStatus? status, int page, int pageSize, CancellationToken ct)
+        ReviewStatus? status, int page, int pageSize, CancellationToken ct, EntityType? type = null, string? search = null)
     {
         if (!await db.Investigations.AnyAsync(x => x.Id == investigationId, ct)) throw new SourceException(404, "Investigation not found.");
         var query = db.EntityMentions.AsNoTracking().Where(x => x.InvestigationId == investigationId);
         if (sourceId.HasValue) query = query.Where(x => x.SourceId == sourceId);
         if (entityId.HasValue) query = query.Where(x => x.EntityId == entityId);
         if (status.HasValue) query = query.Where(x => x.Status == status);
+        if (type.HasValue) query = query.Where(x => x.OriginalType == type);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToUpperInvariant();
+            query = query.Where(x => x.Text.ToUpper().Contains(term));
+        }
         var count = await query.CountAsync(ct);
         var items = await query.OrderBy(x => x.SourceId).ThenBy(x => x.Start).ThenBy(x => x.Id)
             .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);

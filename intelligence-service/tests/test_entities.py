@@ -85,6 +85,29 @@ def test_exact_utf16_spans_and_repeated_mentions(client):
         assert candidate["confidence"] is None
 
 
+@pytest.mark.parametrize("label", ["CARDINAL", "ORDINAL", "QUANTITY", "MONEY", "PERCENT"])
+def test_quantities_do_not_become_other_entities(label):
+    nlp = spacy.blank("en")
+    doc = Doc(nlp.vocab, words=["20"], ents=[f"B-{label}"])
+    assert extract_entities(lambda _: doc, "20", max_candidates=0) == []
+
+
+def test_real_report_style_text_does_not_promote_numbers_or_ordinary_prose():
+    from app.pipelines.entities import load_pipeline
+
+    text = (
+        "The United States and China face strategic competition in 2026. "
+        "The report has 20 pages and describes three scenarios. "
+        "The assessment discusses political and military developments."
+    )
+    candidates = extract_entities(load_pipeline("en_core_web_sm"), text)
+    names = {candidate.text for candidate in candidates}
+    assert {"The United States", "China", "2026"}.issubset(names)
+    assert not {"20", "three", "political", "military", "developments"} & names
+    for candidate in candidates:
+        assert text[candidate.start : candidate.end] == candidate.text
+
+
 @pytest.mark.parametrize("text", ["", "  \n\t", "No recognized names here."])
 def test_empty_or_no_entities_are_not_fabricated(client, text):
     result = client.post("/process/entities", json=payload(text))

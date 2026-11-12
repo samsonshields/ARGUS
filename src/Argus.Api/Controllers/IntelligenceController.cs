@@ -39,10 +39,12 @@ public sealed class IntelligenceController(ProcessingJobService jobs, EntityRevi
     [HttpGet("investigations/{id:guid}/mentions")]
     public async Task<ActionResult<PageResult<MentionResponse>>> Mentions(Guid id, [FromQuery] Guid? sourceId,
         [FromQuery] Guid? entityId, [FromQuery] ReviewStatus? status, [FromQuery, Range(1, 1000000)] int page = 1,
-        [FromQuery, Range(1, 100)] int pageSize = 50, CancellationToken ct = default)
+        [FromQuery, Range(1, 100)] int pageSize = 50, CancellationToken ct = default,
+        [FromQuery] EntityType? type = null, [FromQuery, StringLength(200)] string? search = null)
     {
         if (status.HasValue && !Enum.IsDefined(status.Value)) return Problem(statusCode: 400, title: "Invalid review status.");
-        return Ok(await review.MentionsAsync(id, sourceId, entityId, status, page, pageSize, ct));
+        if (type.HasValue && !Enum.IsDefined(type.Value)) return Problem(statusCode: 400, title: "Invalid entity type.");
+        return Ok(await review.MentionsAsync(id, sourceId, entityId, status, page, pageSize, ct, type, search));
     }
     [HttpGet("mentions/{id:guid}/evidence")]
     public Task<MentionEvidence> Evidence(Guid id, CancellationToken ct) => review.EvidenceAsync(id, ct);

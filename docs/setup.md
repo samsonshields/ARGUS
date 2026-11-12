@@ -75,10 +75,26 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify.ps1 -Full
 
 The first command restores/builds/tests .NET, verifies formatting, and runs Python
 tests/lint/format/dependency checks. Full additionally starts isolated temporary API,
-Web and NLP instances and runs six live smoke workflows. It uses installed Edge;
+Web and NLP instances and runs seven live smoke workflows. It uses installed Edge;
 `ARGUS_BROWSER_CHANNEL=chrome` selects installed Chrome where supported. No browser
 download is required. The Meridian smoke regenerates fictional portfolio screenshots.
 Temporary services stop in `finally` blocks; logs and transient outputs are in `.local`.
+
+The candidate-review smoke checks immediate status/type filtering, approved/rejected
+visibility, repeated-mention paging, search and the proposed-edge toggle. To additionally
+test a local PDF without changing your normal workspace:
+
+```powershell
+intelligence-service/.venv/Scripts/python.exe scripts/smoke_candidate_review.py --pdf "C:/Research/report.pdf"
+```
+
+Set `ARGUS_BUILD_CONFIGURATION=Debug` when testing a Debug build; Release is the default.
+Each source occurrence has its own review record. Use **All review statuses**, **APPROVED**
+or **REJECTED** to inspect retained decisions. Candidate text search plus type filters can
+narrow large reports. Counts/quantities are excluded from new NER proposals; old stored
+proposals remain intact. The graph includes approved canonical entity nodes; **Include
+proposed edges** immediately toggles relationship proposals, not unreviewed entity mentions.
+Approve source mentions, then generate co-mentions from Relationships to populate edges.
 
 To independently validate migration consistency and NuGet advisories:
 

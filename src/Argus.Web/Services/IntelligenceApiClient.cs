@@ -25,8 +25,9 @@ public sealed class IntelligenceApiClient(HttpClient http)
     public async Task<JobResponse> QueueAsync(Guid id) => await ReadAsync<JobResponse>(await http.PostAsync($"api/v1/sources/{id}/process", null));
     public async Task<JobResponse> CancelAsync(Guid id) => await ReadAsync<JobResponse>(await http.PostAsync($"api/v1/processing-jobs/{id}/cancel", null));
     public async Task<JobResponse> RetryAsync(Guid id) => await ReadAsync<JobResponse>(await http.PostAsync($"api/v1/processing-jobs/{id}/retry", null));
-    public async Task<PageResult<MentionResponse>> MentionsAsync(Guid investigationId, Guid? sourceId, Guid? entityId, string? status, int page = 1)
-        => await ReadAsync<PageResult<MentionResponse>>(await http.GetAsync($"api/v1/investigations/{investigationId}/mentions?sourceId={sourceId}&entityId={entityId}&status={status}&page={page}&pageSize=20"));
+    public async Task<PageResult<MentionResponse>> MentionsAsync(Guid investigationId, Guid? sourceId, Guid? entityId, string? status, int page = 1,
+        string? type = null, string? search = null)
+        => await ReadAsync<PageResult<MentionResponse>>(await http.GetAsync($"api/v1/investigations/{investigationId}/mentions?sourceId={sourceId}&entityId={entityId}&status={status}&page={page}&pageSize=20&type={type}&search={Uri.EscapeDataString(search ?? "")}"));
     public async Task<MentionEvidence> EvidenceAsync(Guid id) => await ReadAsync<MentionEvidence>(await http.GetAsync($"api/v1/mentions/{id}/evidence"));
     public async Task<List<EntitySuggestion>> SuggestionsAsync(Guid id) => await ReadAsync<List<EntitySuggestion>>(await http.GetAsync($"api/v1/mentions/{id}/suggestions"));
     public async Task<EntityResponse> ApproveAsync(Guid id, ApproveMentionRequest request)

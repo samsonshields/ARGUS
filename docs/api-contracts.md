@@ -129,7 +129,7 @@ array contracts remain unchanged for compatibility. Ordering is deterministic.
 | GET | /processing-jobs/{id} | current persisted job |
 | POST | /processing-jobs/{id}/cancel | 200 CANCELLED; 409 for terminal jobs |
 | POST | /processing-jobs/{id}/retry | 202 new job for FAILED/CANCELLED; 409 otherwise |
-| GET | /investigations/{id}/mentions?sourceId=&entityId=&status=PROPOSED&page=1&pageSize=50 | paged mentions, ordered source/start/id |
+| GET | /investigations/{id}/mentions?sourceId=&entityId=&status=PROPOSED&type=&search=&page=1&pageSize=50 | paged mentions, ordered source/start/id |
 | GET | /mentions/{id}/evidence | mention + before/quote/after + immutable textHash |
 | GET | /mentions/{id}/suggestions | up to 10 same-type name/alias matches; never automatically merged |
 | POST | /mentions/{id}/approve | 200 approved entity; 409 if already reviewed |
@@ -149,6 +149,10 @@ Interrupted running jobs recover on startup with their attempt count preserved.
 Mention fields: id/sourceId/sourceTitle/snapshotId/text/originalType/start/end/status/
 entityId/modelName/modelVersion/confidence (always null). Types are PERSON, ORGANIZATION,
 LOCATION, DATE, EVENT, OTHER; review statuses are PROPOSED, APPROVED, REJECTED.
+Omitted/empty status returns all review states; optional type filters the original
+model classification, and search matches literal mention text (trimmed, maximum 200
+characters, SQLite ASCII case-insensitive). Filters combine with investigation/source/
+entity scope before counts and pagination. Invalid enum values return 400.
 GET evidence returns a highlighted passage context in the UI; no raw HTML is returned.
 Spans index the immutable text snapshot, not a mutable current extraction.
 

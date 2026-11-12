@@ -13,6 +13,8 @@ LABELS: dict[str, EntityType] = {
     "TIME": "DATE",
     "EVENT": "EVENT",
 }
+# Quantities are observations, not named entities. Dates remain reviewable separately.
+QUANTITY_LABELS = {"CARDINAL", "ORDINAL", "QUANTITY", "MONEY", "PERCENT"}
 
 
 class ExtractionLimitError(Exception):
@@ -29,6 +31,8 @@ def extract_entities(nlp: Language, text: str, max_candidates: int = 5000) -> li
     result: list[EntityCandidate] = []
     seen: set[tuple[int, int, str]] = set()
     for entity in nlp(text).ents:
+        if entity.label_ in QUANTITY_LABELS:
+            continue
         entity_type = LABELS.get(entity.label_, "OTHER")
         key = (utf16[entity.start_char], utf16[entity.end_char], entity_type)
         if key in seen:

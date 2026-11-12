@@ -30,9 +30,15 @@ Offsets refer to exact input/snapshot text, without additional NLP normalization
 They do not index raw PDF bytes or the pre-normalized uploaded file.
 
 Deterministic label mapping: PERSON -> PERSON; ORG -> ORGANIZATION; GPE/LOC/FAC ->
-LOCATION; DATE/TIME -> DATE; EVENT -> EVENT; all other labels -> OTHER. DATE candidates
+LOCATION; DATE/TIME -> DATE; EVENT -> EVENT. CARDINAL, ORDINAL, QUANTITY, MONEY and
+PERCENT are excluded: standalone counts, rankings, measurements and amounts are not
+named entities. Other labels (including NORP) -> OTHER. DATE candidates
 remain date mentions, not resolved timeline events. No relative dates are invented.
 Duplicate span/type candidates are removed deterministically. Confidence is always null.
+Each repeated occurrence retains its own exact source span. A candidate count is not
+a count of unique identities, nor an assertion that every word in a source is an entity.
+Existing stored candidates and approved/rejected history are retained when reprocessing;
+the quantity filter affects newly generated candidates and does not erase prior findings.
 
 The API independently validates version, source, hash, model metadata, allowed types,
 span bounds, surrogate boundaries, exact substring equality, null confidence, candidate

@@ -93,6 +93,41 @@ public sealed class IntelligenceWorkflowTests : IDisposable
     }
 
     [Fact]
+    public async Task MentionSearchAndTypeFiltersRetainAllReviewStatesAndSourceScope()
+    {
+        using var api = Factory();
+        using var client = api.CreateClient();
+        var (inv, source) = await Import(client);
+        await Run(api);
+        var mentions = (await Mentions(client, inv)).Items;
+        var person = mentions.Single(x => x.OriginalType == EntityType.PERSON);
+        var org = mentions.Single(x => x.OriginalType == EntityType.ORGANIZATION);
+        (await client.PostAsJsonAsync($"/api/v1/mentions/{person.Id}/approve", new ApproveMentionRequest { Name = "Alice Morgan", Type = EntityType.PERSON }, Json)).EnsureSuccessStatusCode();
+        (await client.PostAsync($"/api/v1/mentions/{org.Id}/reject", null)).EnsureSuccessStatusCode();
+        var route = $"/api/v1/investigations/{inv}/mentions";
+        var approved = (await client.GetFromJsonAsync<PageResult<MentionResponse>>(route + $"?sourceId={source}&status=APPROVED&type=PERSON&search=mOrGaN", Json))!;
+        Assert.Equal(person.Id, Assert.Single(approved.Items).Id);
+        var rejected = (await client.GetFromJsonAsync<PageResult<MentionResponse>>(route + "?status=REJECTED&type=ORGANIZATION&search=United%20Nations", Json))!;
+        Assert.Equal(org.Id, Assert.Single(rejected.Items).Id);
+        Assert.Equal(2, (await client.GetFromJsonAsync<PageResult<MentionResponse>>(route + "?status=&type=&search=", Json))!.Total);
+        foreach (var filter in new[] { "status=PROPOSED", "type=PERSON&search=United", $"sourceId={Guid.NewGuid()}" })
+            Assert.Empty((await client.GetFromJsonAsync<PageResult<MentionResponse>>(route + "?" + filter, Json))!.Items);
+        Assert.Equal(1, (await client.GetFromJsonAsync<PageResult<EntityResponse>>($"/api/v1/investigations/{inv}/entities", Json))!.Total);
+    }
+
+    [Theory]
+    [InlineData("type=999")]
+    [InlineData("type=invalid")]
+    [InlineData("status=invalid")]
+    public async Task InvalidMentionFiltersAreRejected(string filter)
+    {
+        using var api = Factory();
+        using var client = api.CreateClient();
+        var (inv, _) = await Import(client);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync($"/api/v1/investigations/{inv}/mentions?{filter}")).StatusCode);
+    }
+
+    [Fact]
     public async Task FailuresRetryWithinBudgetAndCanBeManuallyRetried()
     {
         var offline = new TestNlp { Failure = new("nlp_unavailable", "Service unavailable", true) };
