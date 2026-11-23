@@ -2,8 +2,15 @@
 @rendermode InteractiveServer
 @inject InvestigationClient Client
 @inject NavigationManager Navigation
-<PageTitle>ARGUS | Investigation overview</PageTitle>
-<InvestigationNav Id="Id" />
+<PageTitle>ARGUS | Overview</PageTitle>
+@* Section tabs would all lead to further not-found pages, so they are omitted for a missing investigation. *@
+@if (!notFound) { <InvestigationNav Id="Id" /> }
+@if (notFound)
+{
+    <div class="page-head"><div><h1>Investigation not found</h1>
+        <p class="lede">No investigation exists with this ID. It may have been deleted.</p></div></div>
+    <div class="actions"><a class="button primary" href="/investigations">Open investigations</a></div>
+}
 @if (error is not null) { <ErrorNotice Message="@error" /> }
 @if (loading) { <p role="status">Loading investigation…</p> }
 else if (item is not null)
@@ -12,7 +19,8 @@ else if (item is not null)
     <div class="page-head">
         <div><h1>@item.Title</h1></div>
         <div class="actions"><a class="button" href="@($"/investigations/{Id}/edit")">Edit details / archive</a>
-            <a class="button primary" href="@($"/investigations/{Id}/sources")">Source library</a></div>
+            @if (NextAction() is { } next) { <a class="button primary" href="@next.Href">@next.Label</a> }
+            else if (workflow?.NextStep == WorkflowStep.UP_TO_DATE) { <span>No proposals awaiting review</span> }</div>
     </div>
     <div class="overview-grid">
         <div>
@@ -20,39 +28,80 @@ else if (item is not null)
                 <p class="description">@(string.IsNullOrEmpty(item.Description) ? "No description provided." : item.Description)</p>
             </section>
             <h2 id="workflow-heading">Analytic workflow</h2>
-            <ol class="workflow" aria-labelledby="workflow-heading">
-                <li><a href="@($"/investigations/{Id}/sources")">Sources</a><span>Import originals; text is extracted and preserved as a snapshot.</span></li>
-                <li><a href="@($"/investigations/{Id}/entities")">Entities and review</a><span>Approve, correct or reject machine-proposed mentions.</span></li>
-                <li><a href="@($"/investigations/{Id}/relationships")">Relationship review</a><span>Substantiate co-mention proposals with cited passages.</span></li>
-                <li><a href="@($"/investigations/{Id}/graph")">Relationship graph</a><span>Inspect structure, paths and centrality across reviewed links.</span></li>
-                <li><a href="@($"/investigations/{Id}/timeline")">Timeline and event review</a><span>Order events while keeping month, year and unknown precision.</span></li>
-                <li><a href="@($"/investigations/{Id}/map")">Geography and locations</a><span>Place approved locations with explicit uncertainty radii.</span></li>
-                <li><a href="@($"/investigations/{Id}/assessments")">Assessments and claims</a><span>Weigh supporting and contradicting evidence; record confidence.</span></li>
-                <li><a href="@($"/investigations/{Id}/reports")">Markdown reports</a><span>Export immutable, source-referenced report snapshots.</span></li>
+            <ol class="phases" aria-labelledby="workflow-heading">
+                @foreach (var phase in phases)
+                {
+                    <li>
+                        <h3>@phase.Name</h3>
+                        <ul class="stages">
+                            @foreach (var (stage, description) in phase.Stages)
+                            {
+                                var isNext = stage == NextStage();
+                                <li class="@(isNext ? "is-next" : null)" aria-current="@(isNext ? "step" : null)">
+                                    <div class="stage-head">
+                                        <span class="step-name">@stage</span>
+                                        @if (isNext) { <span class="stage-next">Next step</span> }
+                                        @if (workflow is not null)
+                                        {
+                                            var status = StageStatus(stage);
+                                            <span class="stage-status">
+                                                @for (var i = 0; i < status.Length; i++)
+                                                {
+                                                    var (text, tone) = status[i];
+                                                    @if (i > 0) { <span class="sep" aria-hidden="true"> · </span> }
+                                                    <span class="@tone">@text</span>
+                                                }
+                                            </span>
+                                        }
+                                    </div>
+                                    <p>@description</p>
+                                </li>
+                            }
+                        </ul>
+                    </li>
+                }
             </ol>
         </div>
         <aside>
             <section class="panel" aria-labelledby="facts-heading">
                 <h2 id="facts-heading">Case record</h2>
                 <dl class="facts">
-                    <dt>Status</dt><dd><StatusTag Value="item.Status" /></dd>
                     <dt>Region</dt><dd>@(item.Region ?? "Unspecified")</dd>
-                    <dt>Research scope</dt><dd class="mono">@(item.StartDate?.ToString("yyyy-MM-dd") ?? "Unknown") to @(item.EndDate?.ToString("yyyy-MM-dd") ?? "Unknown")</dd>
+                    <dt>Research scope</dt>
+                    @if (item.StartDate is null && item.EndDate is null) { <dd>Not set</dd> }
+                    else { <dd class="mono">@(item.StartDate?.ToString("yyyy-MM-dd") ?? "no start date") to @(item.EndDate?.ToString("yyyy-MM-dd") ?? "no end date")</dd> }
                     <dt>Created (UTC)</dt><dd class="mono">@item.CreatedAt.ToString("u")</dd>
-                    <dt>Updated (UTC)</dt><dd class="mono">@item.UpdatedAt.ToString("u")</dd>
+                    @* Shown only when it adds information; an unedited record would repeat the creation time. *@
+                    @if (item.UpdatedAt.ToString("u") != item.CreatedAt.ToString("u")) { <dt>Updated (UTC)</dt><dd class="mono">@item.UpdatedAt.ToString("u")</dd> }
                     <dt>Record ID</dt><dd><code>@item.Id</code></dd>
+                    @if (workflow is { Counts.Sources: > 0 } preserved)
+                    {
+                        // The API refuses deletion while sources exist; say so instead of offering a control that fails.
+                        var sources = preserved.Counts.Sources;
+                        <dt>Deletion</dt>
+                        <dd>Unavailable: @sources preserved @(sources == 1 ? "source" : "sources").
+                            @if (item.Status == InvestigationStatus.Archived) { <span>The archive retains their evidence.</span> }
+                            else { <a href="@($"/investigations/{Id}/edit")">Archive instead</a> }</dd>
+                    }
                 </dl>
             </section>
-            <section class="panel danger-zone"><h2>Delete investigation</h2>
-            <p class="muted">Investigations with preserved sources cannot be deleted. Archive them to retain their evidence.</p>
-            @if (!confirming) { <button class="danger" @onclick="() => confirming = true">Delete…</button> }
-            else
+            @if (deleteError is not null && workflow is { Counts.Sources: > 0 }) { <div class="error" role="alert"><p>@deleteError</p></div> }
+            @if (workflow is not { Counts.Sources: > 0 })
             {
-                <p>This permanently removes <strong>@(item.Title)</strong>. This action cannot be undone.</p>
-                <div class="actions"><button class="danger" disabled="@deleting" @onclick="DeleteAsync">Confirm permanent deletion</button>
-                    <button disabled="@deleting" @onclick="() => confirming = false">Cancel</button></div>
+                <section class="panel danger-zone" aria-labelledby="delete-heading"><h2 id="delete-heading">Delete investigation</h2>
+                <p class="muted">@(workflow is null
+                    ? "Investigations with preserved sources cannot be deleted. Archive them to retain their evidence."
+                    : "This investigation has no preserved sources, so it can be permanently deleted.")</p>
+                @if (deleteError is not null) { <div class="error" role="alert"><p>@deleteError</p></div> }
+                @if (!confirming) { <button class="danger" @onclick="() => { confirming = true; deleteError = null; }">Delete…</button> }
+                else
+                {
+                    <p>This permanently removes <strong>@(item.Title)</strong>. This action cannot be undone.</p>
+                    <div class="actions"><button class="danger" disabled="@deleting" @onclick="DeleteAsync">@(deleting ? "Deleting…" : "Confirm permanent deletion")</button>
+                        <button disabled="@deleting" @onclick="() => confirming = false">Cancel</button></div>
+                }
+                </section>
             }
-            </section>
         </aside>
     </div>
 }
@@ -60,22 +109,114 @@ else if (item is not null)
     [Parameter] public Guid Id { get; set; }
     [SupplyParameterFromQuery] public bool Saved { get; set; }
     private InvestigationResponse? item;
-    private string? error;
-    private bool loading = true, confirming, deleting;
+    private WorkflowSummary? workflow;
+    private string? error, deleteError;
+    private bool loading = true, notFound, confirming, deleting;
+    // Stage names match the investigation tabs exactly; the tabs are the route to each stage.
+    private static readonly (string Name, (string Stage, string Description)[] Stages)[] phases =
+    [
+        ("Collect", [("Sources", "Import originals; text is extracted and preserved as a snapshot.")]),
+        ("Review", [("Entities", "Approve, correct or reject machine-proposed mentions."),
+            ("Relationships", "Substantiate co-mention proposals with cited passages."),
+            ("Timeline", "Order events while keeping month, year and unknown precision."),
+            ("Geography", "Place approved locations with explicit uncertainty radii.")]),
+        ("Analyse", [("Graph", "Inspect structure, paths and centrality across reviewed links."),
+            ("Assessments", "Weigh supporting and contradicting evidence; record confidence.")]),
+        ("Publish", [("Reports", "Export immutable, source-referenced Markdown report snapshots.")])
+    ];
     protected override async Task OnParametersSetAsync()
     {
-        loading = true; error = null; confirming = false;
-        try { item = await Client.GetAsync(Id); if (item is null) error = "Investigation not found."; }
+        loading = true; error = deleteError = null; notFound = confirming = false; item = null; workflow = null;
+        try { item = await Client.GetAsync(Id); notFound = item is null; }
         catch (HttpRequestException) { error = "Unable to load investigation. Check the API and reload."; }
         catch (TaskCanceledException) { error = "The request timed out. Reload to retry."; }
         finally { loading = false; }
+        if (item is null) return;
+        // The next action is a convenience; if the summary fails the page still works from the tabs.
+        try { workflow = await Client.WorkflowAsync(Id); }
+        catch (HttpRequestException) { workflow = null; }
+        catch (TaskCanceledException) { workflow = null; }
+    }
+    private (string Label, string Href)? NextAction()
+    {
+        if (workflow is null) return null;
+        var n = workflow.NextStepCount;
+        string Count(string singular, string plural) => $"Review {n} proposed {(n == 1 ? singular : plural)}";
+        return workflow.NextStep switch
+        {
+            WorkflowStep.IMPORT_SOURCES => ("Import sources", $"/investigations/{Id}/sources"),
+            WorkflowStep.AWAIT_EXTRACTION => ("Check entity extraction", "/processing-jobs"),
+            WorkflowStep.REVIEW_ENTITIES => (Count("mention", "mentions"), $"/investigations/{Id}/entities"),
+            WorkflowStep.REVIEW_RELATIONSHIPS => (Count("relationship", "relationships"), $"/investigations/{Id}/relationships"),
+            WorkflowStep.REVIEW_EVENTS => (Count("event", "events"), $"/investigations/{Id}/timeline"),
+            WorkflowStep.REVIEW_LOCATIONS => (Count("location", "locations"), $"/investigations/{Id}/map"),
+            WorkflowStep.REVIEW_CLAIMS => (Count("claim", "claims"), $"/investigations/{Id}/assessments"),
+            WorkflowStep.GENERATE_REPORT => ("Generate a report", $"/investigations/{Id}/reports"),
+            _ => null
+        };
+    }
+    private string? NextStage() => workflow?.NextStep switch
+    {
+        WorkflowStep.IMPORT_SOURCES => "Sources",
+        WorkflowStep.AWAIT_EXTRACTION or WorkflowStep.REVIEW_ENTITIES => "Entities",
+        WorkflowStep.REVIEW_RELATIONSHIPS => "Relationships",
+        WorkflowStep.REVIEW_EVENTS => "Timeline",
+        WorkflowStep.REVIEW_LOCATIONS => "Geography",
+        WorkflowStep.REVIEW_CLAIMS => "Assessments",
+        WorkflowStep.GENERATE_REPORT => "Reports",
+        _ => null
+    };
+    // Presentation only: the counts and their meaning come from the API's workflow summary.
+    private (string Text, string Tone)[] StageStatus(string stage)
+    {
+        var c = workflow!.Counts;
+        (string, string)[] None(string text = "None yet") => [(text, "count-none")];
+        (string, string)[] Review(StageCounts s)
+        {
+            if (s.Proposed == 0 && s.Approved == 0) return None();
+            var parts = new List<(string, string)>();
+            if (s.Proposed > 0) parts.Add(($"{s.Proposed} proposed", "count-proposed"));
+            if (s.Approved > 0) parts.Add(($"{s.Approved} approved", "count-approved"));
+            return [.. parts];
+        }
+        return stage switch
+        {
+            "Sources" => c.Sources == 0 ? None() : [($"{c.Sources} preserved", "count-approved")],
+            "Entities" when c.Sources > 0 && c.Mentions == 0 => None("Awaiting extraction"),
+            "Entities" => Review(c.Entities),
+            "Relationships" => Review(c.Relationships),
+            "Timeline" => Review(c.Events),
+            "Geography" => Review(c.Locations),
+            "Graph" => c.Relationships.Approved == 0 ? None("No reviewed links yet")
+                : [($"{c.Relationships.Approved} reviewed {(c.Relationships.Approved == 1 ? "link" : "links")}", "count-approved")],
+            "Assessments" => c.UnresolvedContradictions == 0 ? Review(c.Claims)
+                : [.. Review(c.Claims).Where(x => x.Item2 != "count-none"),
+                    ($"{c.UnresolvedContradictions} unresolved {(c.UnresolvedContradictions == 1 ? "contradiction" : "contradictions")}", "count-alert")],
+            "Reports" => c.Reports == 0 ? None() : [($"{c.Reports} generated", "count-approved")],
+            _ => []
+        };
     }
     private async Task DeleteAsync()
     {
-        deleting = true;
+        if (deleting) return;
+        deleting = true; deleteError = null;
         try { await Client.DeleteAsync(Id); Navigation.NavigateTo("/investigations"); }
-        catch (HttpRequestException ex) { error = ClientErrors.Describe(ex); }
-        catch (TaskCanceledException) { error = "Deletion timed out. Check the list before retrying."; }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            // Sources were imported after this page loaded; refresh so the record explains why deletion is unavailable.
+            confirming = false;
+            deleteError = "Sources were added since this page loaded, so this investigation can no longer be deleted. Archive it to retain their evidence.";
+            try
+            {
+                workflow = await Client.WorkflowAsync(Id);
+                // Still no sources: the conflict had another cause, so report the API's own message.
+                if (workflow.Counts.Sources == 0) deleteError = ClientErrors.Describe(ex);
+            }
+            catch (HttpRequestException) { }
+            catch (TaskCanceledException) { }
+        }
+        catch (HttpRequestException ex) { deleteError = ClientErrors.Describe(ex); }
+        catch (TaskCanceledException) { deleteError = "Deletion timed out. Check the investigation list before retrying."; }
         finally { deleting = false; }
     }
 }

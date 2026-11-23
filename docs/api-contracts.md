@@ -8,6 +8,7 @@ GUID IDs, ISO UTC timestamps and YYYY-MM-DD scope dates.
 | GET | /investigations?search=term&status=Active | 200 array; filters optional |
 | POST | /investigations | 201 object and Location header |
 | GET | /investigations/{id} | 200 object or 404 |
+| GET | /investigations/{id}/workflow | 200 review-state counts (sources, mentions, proposed/approved for entities (mentions), relationships, events, locations and claims, unresolved contradictions, reports), `nextStep` and `nextStepCount`; 404 missing. Unresolved contradictions are reported but never become the next step. |
 | PUT | /investigations/{id} | 200 replacement metadata or 404 |
 | DELETE | /investigations/{id}?confirm=true | 204; 400 without confirmation; 404 missing; 409 if sources exist |
 

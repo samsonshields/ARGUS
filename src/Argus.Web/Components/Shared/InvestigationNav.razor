@@ -4,10 +4,11 @@
 <div class="case-head">
     <nav class="breadcrumb" aria-label="Breadcrumb">
         <a href="/investigations">Investigations</a>
-        @if (title is not null && current != "")
+        @if (title is not null)
         {
             <span class="crumb-sep" aria-hidden="true">/</span>
-            <a href="@($"/investigations/{Id}")">@title</a>
+            @if (current == "") { <span class="crumb-current" aria-current="page">@title</span> }
+            else { <a href="@($"/investigations/{Id}")">@title</a> }
         }
         @if (status is not null) { <StatusTag Value="status" /> }
     </nav>
@@ -26,8 +27,9 @@
     private string? title, current;
     private InvestigationStatus? status;
     private Guid loaded;
+    // Ordered by workflow phase (Collect, Review, Analyse, Publish), matching the Overview's analytic workflow.
     private static readonly (string Path, string Label)[] sections = [("", "Overview"), ("/sources", "Sources"), ("/entities", "Entities"),
-        ("/relationships", "Relationships"), ("/graph", "Graph"), ("/timeline", "Timeline"), ("/map", "Geography"), ("/assessments", "Assessments"), ("/reports", "Reports")];
+        ("/relationships", "Relationships"), ("/timeline", "Timeline"), ("/map", "Geography"), ("/graph", "Graph"), ("/assessments", "Assessments"), ("/reports", "Reports")];
 
     protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
 

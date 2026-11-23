@@ -46,6 +46,9 @@
     --marking-height: 26px;
     --topbar-height: 72px;
     --container: 1320px;
+    /* Type roles: tracked-caps labels (tags, pills, table headers) and the prose measure. 58ch of IBM Plex Sans is ~75 characters; ch is the width of "0". */
+    --label-size: .75rem;
+    --measure: 58ch;
     --gutter: 40px;
     --stick: 0px;
     font-family: var(--sans);
@@ -63,10 +66,10 @@ img, svg { max-width: 100%; }
 
 /* ---------- Type ---------- */
 h1, h2, h3 { color: var(--ink); text-wrap: balance; font-weight: 500; letter-spacing: -.03em; }
-h1 { font-size: clamp(2rem, 3.4vw, 2.875rem); line-height: 1.08; margin: 0; }
+h1 { font-size: clamp(2rem, 3.4vw, 2.875rem); line-height: 1.08; margin: 0; overflow-wrap: break-word; }
 h2 { font-size: 1.5rem; line-height: 1.2; letter-spacing: -.025em; margin: 2.25rem 0 .875rem; }
 h3 { font-size: 1rem; line-height: 1.35; font-weight: 600; letter-spacing: -.01em; margin: 1.25rem 0 .5rem; }
-p { margin: .6rem 0; max-width: 72ch; }
+p { margin: .6rem 0; max-width: var(--measure); text-wrap: pretty; }
 a { color: var(--ink); text-decoration: underline; text-decoration-color: var(--rule-strong); text-decoration-thickness: 1px; text-underline-offset: 3px; }
 a:hover { text-decoration-color: var(--ink); }
 .button, .brand, .skip-link, .main-nav a, .foot-nav a, .investigation-nav a, .breadcrumb a, .workflow a,
@@ -76,7 +79,7 @@ code { color: var(--ink-2); overflow-wrap: anywhere; }
 strong { font-weight: 600; }
 abbr[title] { text-decoration: none; cursor: help; }
 .muted { color: var(--ink-2); }
-.lede { color: var(--ink-2); font-size: 1.0625rem; line-height: 1.55; max-width: 64ch; margin: 14px 0 0; }
+.lede { color: var(--ink-2); font-size: 1.0625rem; line-height: 1.55; max-width: 56ch; margin: 14px 0 0; }
 .description { white-space: pre-wrap; overflow-wrap: anywhere; }
 .success { color: var(--reviewed); }
 .contradiction { color: var(--proposed); }
@@ -97,7 +100,7 @@ h1[tabindex="-1"]:focus { outline: none; }
 .marking {
     z-index: 900; display: flex; align-items: center; justify-content: center; gap: 10px;
     height: var(--marking-height); background: var(--inset); color: var(--ink-2);
-    font: 600 .6875rem/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; overflow: hidden;
+    font: 600 var(--label-size)/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; overflow: hidden;
 }
 .marking::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--reviewed); flex-shrink: 0; }
 .marking-top { position: sticky; top: 0; border-bottom: 1px solid var(--rule); }
@@ -107,7 +110,8 @@ h1[tabindex="-1"]:focus { outline: none; }
 .skip-link { position: fixed; left: 16px; top: -90px; z-index: 10000; padding: 10px 18px; background: var(--ink); color: var(--ground); border-radius: var(--radius); font-weight: 600; }
 .skip-link:focus { top: 36px; }
 
-.shell { min-height: calc(100vh - 2 * var(--marking-height)); display: flex; flex-direction: column; }
+.shell { min-height: 100vh; display: flex; flex-direction: column; }
+body:has(.marking-top) .shell { min-height: calc(100vh - 2 * var(--marking-height)); }
 .topbar { position: sticky; top: var(--stick); z-index: 800; background: rgba(15, 15, 15, .94); backdrop-filter: blur(10px); border-bottom: 1px solid var(--rule); }
 .topbar-inner { max-width: var(--container); margin: 0 auto; padding: 0 var(--gutter); min-height: var(--topbar-height); display: flex; align-items: center; gap: 36px; }
 .brand { display: inline-flex; align-items: center; gap: 12px; color: var(--ink); }
@@ -252,13 +256,13 @@ summary:hover { color: var(--ink); }
 
 dl.facts { display: grid; grid-template-columns: max-content 1fr; gap: 10px 28px; margin: 0; font-size: .9375rem; }
 dl.facts dt { color: var(--ink-3); }
-dl.facts dd { margin: 0; overflow-wrap: anywhere; }
+dl.facts dd { margin: 0; overflow-wrap: anywhere; text-wrap: pretty; }
 dl.facts code { color: var(--ink); }
 
 /* ---------- Status vocabulary ---------- */
 .pill, .tag {
     display: inline-flex; align-items: center; gap: 7px; padding: 3px 10px; min-height: 24px; border-radius: var(--radius);
-    font-size: .6875rem; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; line-height: 1.3; white-space: nowrap;
+    font-size: var(--label-size); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; line-height: 1.3; white-space: nowrap;
     background: var(--raised); color: var(--ink-2);
 }
 .dot, .tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
@@ -317,7 +321,7 @@ a.investigation-row:hover, .relationship-row:hover, .mention-row:hover { backgro
 
 .data-table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: var(--radius-lg); background: var(--band); margin: 14px 0; }
 .data-table { width: 100%; border-collapse: collapse; font-size: .9375rem; }
-.data-table th { text-align: left; font-weight: 600; font-size: .6875rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); padding: 12px 18px; border-bottom: 1px solid var(--rule); white-space: nowrap; background: var(--inset); }
+.data-table th { text-align: left; font-weight: 600; font-size: var(--label-size); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); padding: 12px 18px; border-bottom: 1px solid var(--rule); white-space: nowrap; background: var(--inset); }
 .data-table td { padding: 14px 18px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
 .data-table tr:last-child td { border-bottom: 0; }
 .data-table tbody tr:hover { background: var(--raised); }
@@ -403,6 +407,31 @@ mark { background: rgba(246, 183, 4, .22); color: var(--ink); padding: 1px 3px; 
 .workflow li:has(a:focus-visible) { outline: 2px solid var(--focus); outline-offset: 3px; }
 .workflow a:focus-visible { outline: none; }
 .workflow span { font-size: .875rem; color: var(--ink-3); }
+/* Overview status board: phases are rows; each stage (named exactly as its tab) shows live review state. */
+.phases { list-style: none; margin: 14px 0; padding: 0; background: var(--band); border: 1px solid var(--rule); border-radius: var(--radius-lg); }
+.phases > li { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 4px 24px; align-items: baseline; padding: 12px 24px; }
+.phases > li + li { border-top: 1px solid var(--rule); }
+.phases h3 { margin: 0; font-size: .875rem; font-weight: 600; letter-spacing: 0; color: var(--ink-2); line-height: 1.6; }
+.stages { list-style: none; margin: 0; padding: 0; }
+.stages > li { margin: 0 -12px; padding: 8px 12px; border-radius: var(--radius); }
+.stages > li.is-next { background: var(--raised); }
+.stage-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+.step-name { font-weight: 500; color: var(--ink); }
+.stage-next { font-size: .8125rem; font-weight: 600; color: var(--ink-2); }
+.stage-status { margin-left: auto; font-size: .875rem; color: var(--ink); text-align: right; }
+.stage-status .sep { color: var(--ink-3); }
+.stages p { margin: 2px 0 0; max-width: var(--measure); font-size: .875rem; line-height: 1.55; color: var(--ink-3); }
+.count-approved { color: var(--ink); }
+.count-none { color: var(--ink-3); }
+.count-proposed, .count-alert { white-space: nowrap; }
+.count-proposed { color: var(--proposed); }
+.count-alert { color: var(--alert); }
+/* Same marker language as tags: hollow = machine proposed, solid = contradiction. */
+.count-proposed::before, .count-alert::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; vertical-align: .08em; }
+.count-proposed::before { box-shadow: inset 0 0 0 1.5px currentColor; }
+.count-alert::before { background: currentColor; }
+.crumb-current { color: var(--ink-2); }
+.breadcrumb a, .crumb-current { min-width: 0; overflow-wrap: anywhere; }
 .export-steps { grid-template-columns: minmax(0, 1fr); margin: 6px 0 16px; }
 .export-steps li { padding: 14px 18px; background: var(--inset); }
 .export-steps li:hover { background: var(--inset); }
@@ -504,7 +533,7 @@ details.disclosure label { margin-top: 12px; }
     .band { padding: 28px; }
 }
 @media (max-width: 760px) {
-    :root { --gutter: 16px; font-size: 14.5px; }
+    :root { --gutter: 16px; }
     .topbar-meta .pill { display: none; }
     main { padding-top: 28px; padding-bottom: 56px; }
     .hero { padding: 32px 0 28px; }
@@ -514,11 +543,15 @@ details.disclosure label { margin-top: 12px; }
     .filters { padding: 14px; }
     .filters > label { flex-basis: 100%; }
     .filters > label:has(> input[type=checkbox]) { padding-top: 0; }
-    .investigation-nav { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+    /* Tabs scroll sideways; the right-edge fade signals more tabs, and the end padding lets the last tab clear it. */
+    .investigation-nav { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; padding-inline-end: 40px;
+        mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent); }
     .investigation-nav a { white-space: nowrap; }
     .pipeline { grid-template-columns: minmax(0, 1fr); }
     .stage-count { font-size: 2.75rem; margin: 12px 0 8px; }
     .workflow { grid-template-columns: minmax(0, 1fr); }
+    .phases > li { grid-template-columns: minmax(0, 1fr); padding: 12px 18px; }
+    .stage-status { margin-left: 0; flex-basis: 100%; text-align: left; }
     dl.facts { grid-template-columns: minmax(0, 1fr); gap: 2px 0; }
     dl.facts dd { margin-bottom: 10px; }
     dl.facts.validation-counts { grid-template-columns: max-content 1fr; gap: 6px 16px; }
@@ -530,7 +563,7 @@ details.disclosure label { margin-top: 12px; }
     .graph-canvas { height: 440px; }
     .map-canvas { height: 420px; }
     .legend-cols { grid-template-columns: minmax(0, 1fr); }
-    .marking { font-size: .625rem; letter-spacing: .08em; }
+    .marking { letter-spacing: .08em; }
     .site-foot-inner { padding-block: 28px; }
 }
 @media (prefers-reduced-motion: reduce) {

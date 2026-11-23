@@ -20,6 +20,9 @@ public sealed class InvestigationsController(InvestigationService service, ILogg
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<InvestigationResponse>> Get(Guid id, CancellationToken ct)
         => await service.GetAsync(id, ct) is { } result ? Ok(result) : Problem(statusCode: 404, title: "Investigation not found.");
+    [HttpGet("{id:guid}/workflow")]
+    public Task<WorkflowSummary> Workflow(Guid id, [FromServices] WorkflowService workflow, CancellationToken ct)
+        => workflow.SummaryAsync(id, ct);
     [HttpPost]
     public async Task<ActionResult<InvestigationResponse>> Create(InvestigationRequest request, CancellationToken ct)
     {
