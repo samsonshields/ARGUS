@@ -23,6 +23,12 @@ public sealed class InvestigationClient(HttpClient http)
         await CheckAsync(response);
         return await response.Content.ReadFromJsonAsync<InvestigationResponse>(Json);
     }
+    public async Task<WorkflowSummary> WorkflowAsync(Guid id)
+    {
+        using var response = await http.GetAsync($"api/v1/investigations/{id}/workflow");
+        await CheckAsync(response);
+        return (await response.Content.ReadFromJsonAsync<WorkflowSummary>(Json))!;
+    }
     public async Task<InvestigationResponse> SaveAsync(Guid? id, InvestigationRequest request)
     {
         using var response = id.HasValue

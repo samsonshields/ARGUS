@@ -1,11 +1,12 @@
 # Interface direction
 
-ARGUS is a local evidence workstation for open-source research. The interface follows a
-dark "command console" language: near-black ground, large inset rounded bands, a horizontal
+ARGUS is a local evidence workstation for open-source research. The interface is a sober,
+dark analytical workspace: near-black ground, large inset rounded bands, a horizontal
 top navigation, big medium-weight headlines with tight tracking, bordered stat cards and
-corner-bracket frames around the graph and map. It keeps the conventions analysts already
-read fluently: a data-handling marking strip, Zulu time, ICD 203 confidence wording and
-Admiralty-style source grades.
+corner-bracket frames around the graph and map. It keeps the analytic conventions researchers
+already read fluently: UTC time, ICD 203 confidence wording and Admiralty-style source grades.
+It avoids military or agency costume: no classification-style banners, targeting motifs or
+"hacker" neon.
 
 ## Principle: color is evidence state
 
@@ -31,7 +32,9 @@ IBM Plex Sans (headlines weight 500 with -0.03em tracking, body 15px) and Source
 for hashes, offsets, coordinates and UTC timestamps. Both are vendored as variable woff2
 files under `wwwroot/vendor` (SIL OFL 1.1, checksums in `integrity.json`), so the
 workstation still makes no network requests. Status pills and table headers use small
-tracked capitals; everything else is sentence case.
+tracked capitals at `--label-size` (0.75rem, 11.25px, never below the 11px floor); everything
+else is sentence case. The 15px root holds at every width (phones are not shrunk). Prose uses
+`--measure` (58ch, about 75 characters of Plex) with `text-wrap: pretty`; headings balance.
 
 ## Components
 
@@ -39,8 +42,11 @@ tracked capitals; everything else is sentence case.
   Dense in-list actions (pagers, citation and job buttons) use a quieter grey outline.
 * **Section marker:** ring-and-dot before each section heading.
 * **Stat cards:** the dashboard evidence pipeline and queue use bordered cards with large
-  numerals; the overview "analytic workflow" is a grid of cards. Numbers appear only where
-  the content is a real sequence.
+  numerals. The overview "analytic workflow" is a status board: one bordered panel with a row per phase
+  (Collect, Review, Analyse, Publish), each stage named exactly as its tab with its live counts
+  (hollow amber "N proposed", plain "N approved", red "N unresolved contradictions") and the
+  next step on a raised row. Numbers appear only
+  where the content is a real sequence.
 * **Bands:** a larger section is an inset `#161618` rounded band on the ground.
 * **Frames:** the graph and map canvases carry corner brackets and a faint dot or coordinate grid.
 * **Hero:** the dashboard opens with a centered headline over a faint masked grid.
@@ -48,7 +54,7 @@ tracked capitals; everything else is sentence case.
 ## Layout
 
 ```text
-[ marking strip (configurable, Workstation:Marking) ]
+[ optional marking strip (Workstation:Marking; empty and hidden by default) ]
 Brand   Dashboard  Investigations  Processing jobs  Workspace backup      Local workspace  UTC
 Investigations / Case title [status]
 Overview  Sources  Entities  ...  Reports                      (section tabs)
@@ -57,16 +63,16 @@ Lede
 Filter toolbar
 Record list                      | Inspector (sticky; stacks below 1280px)
 Footer: brand, note, links
-[ marking strip ]
+[ optional marking strip ]
 ```
 
 All page content is left aligned except the dashboard hero and stat cards. Empty, loading and
 error states are distinct and give a concrete next action. Focus is a 2px white outline; reduced
 motion and forced colors are respected; there is no page-load animation.
 
-The marking text comes from `Workstation:Marking` in the Web app settings; an empty value hides
-it. The default describes the local workspace content (open-source research) and is not a
-classification decision about imported material.
+The marking text comes from `Workstation:Marking` in the Web app settings. It is empty by
+default, which hides both strips; set it only when an organization's own handling policy
+requires a banner. It is never a classification decision about imported material.
 
 ## Alignment correction (2026-11-12)
 

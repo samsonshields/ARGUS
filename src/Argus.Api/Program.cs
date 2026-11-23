@@ -59,6 +59,7 @@ builder.Services.AddScoped<GraphService>();
 builder.Services.AddScoped<TemporalService>();
 builder.Services.AddScoped<ClaimService>();
 builder.Services.AddScoped<ReportService>();
+builder.Services.AddScoped<WorkflowService>();
 builder.Services.AddSingleton<BackupService>();
 builder.Services.AddHttpClient<IEventClient, IntelligenceClient>((services, client) =>
 {

@@ -1,11 +1,11 @@
 @page "/investigations/{Id:guid}/relationships"
 @rendermode InteractiveServer
 @inject GraphApiClient Client
-<PageTitle>ARGUS | Relationship review</PageTitle>
+<PageTitle>ARGUS | Relationships</PageTitle>
 <InvestigationNav Id="Id" />
 <div class="page-head">
     <div>
-        <h1>Relationship review</h1>
+        <h1>Relationships</h1>
         <p class="lede">Approve entity mentions first, then generate sentence co-mention proposals. No relationship is automatically approved.</p>
     </div>
     <div class="actions"><a class="button quiet" href="/processing-jobs">Monitor background jobs</a><button class="primary" disabled="@busy" @onclick="GenerateAsync">Generate co-mention candidates</button></div>

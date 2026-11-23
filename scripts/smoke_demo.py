@@ -270,7 +270,7 @@ def main() -> None:
                 page = browser.new_page()
                 page.goto(web_url + f"/investigations/{inv}/reports")
                 expect(
-                    page.get_by_role("heading", name="Markdown reports", exact=True)
+                    page.get_by_role("heading", name="Reports", exact=True)
                 ).to_be_visible()
                 expect(page.locator(".relationship-row")).to_have_count(1)
                 stop(api)
